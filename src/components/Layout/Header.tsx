@@ -1,32 +1,55 @@
-// client/src/components/Layout/Header.tsx
-import React from "react";
-import {useSpring, animated} from "@react-spring/web";
-import {FaHome, FaUser, FaCog} from "react-icons/fa";
+import {useNavigate} from "react-router-dom";
+
+import {
+  IconButton,
+  Paper,
+  Tooltip,
+  Typography,
+  Box,
+  Badge,
+} from "@mui/material";
+import {FiBell, FiSettings} from "react-icons/fi";
 
 const Header = () => {
-  const headerAnimation = useSpring({
-    from: {opacity: 0, transform: "translateY(-50px)"},
-    to: {opacity: 1, transform: "translateY(0)"},
-    config: {tension: 300, friction: 10},
-  });
+  const navigate = useNavigate();
 
   return (
-    <animated.header style={headerAnimation}>
-      <h1>Your App</h1>
-      <nav>
-        <ul>
-          <li>
-            <FaHome /> Home
-          </li>
-          <li>
-            <FaUser /> Profile
-          </li>
-          <li>
-            <FaCog /> Settings
-          </li>
-        </ul>
-      </nav>
-    </animated.header>
+    <Paper
+      elevation={2}
+      sx={{
+        py: 2,
+        px: 3,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        position: "fixed",
+        top: 0,
+        right: 0,
+        left: 240, // Match sidebar width
+        zIndex: 1100,
+        borderBottom: "1px solid",
+        borderColor: "divider",
+        bgcolor: "background.paper",
+      }}
+    >
+      <Typography variant="h5" sx={{fontWeight: "medium"}}>
+        Dashboard
+      </Typography>
+      <Box sx={{display: "flex", alignItems: "center", gap: 1}}>
+        <Tooltip title="Notifications">
+          <IconButton>
+            <Badge badgeContent={4} color="error">
+              <FiBell />
+            </Badge>
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Settings">
+          <IconButton onClick={() => navigate("/profile")}>
+            <FiSettings />
+          </IconButton>
+        </Tooltip>
+      </Box>
+    </Paper>
   );
 };
 

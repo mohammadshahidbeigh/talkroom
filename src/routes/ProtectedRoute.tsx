@@ -8,7 +8,7 @@ const ProtectedRoute: React.FC<{children: JSX.Element}> = ({children}) => {
     (state: {auth: {isLoggedIn: boolean}}) => state.auth.isLoggedIn
   );
 
-  return isLoggedIn ? children : <Navigate to="/chat" />;
+  return isLoggedIn ? children : <Navigate to="/login" />;
 };
 
 export default ProtectedRoute;

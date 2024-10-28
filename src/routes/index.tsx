@@ -7,6 +7,7 @@ import ChatRoom from "../components/Chat/ChatRoom";
 import VideoRoom from "../components/Video/VideoRoom";
 import Login from "../components/Auth/Login";
 import Register from "../components/Auth/Register";
+import UserProfile from "../components/UserProfile";
 
 const AppRoutes: React.FC = () => {
   return (
@@ -34,6 +35,14 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <VideoRoom />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <UserProfile username="" email="" />
           </ProtectedRoute>
         }
       />
