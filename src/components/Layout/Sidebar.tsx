@@ -1,6 +1,6 @@
 // client/src/components/Layout/Sidebar.tsx
-import {Link} from "react-router-dom";
-import {Box, Button, Paper} from "@mui/material";
+import {Link, useLocation} from "react-router-dom";
+import {Box, Button, Paper, Typography, useTheme} from "@mui/material";
 import {
   FiBarChart,
   FiMessageCircle,
@@ -13,6 +13,8 @@ import {logout} from "../../store/slices/authSlice";
 
 const Sidebar = () => {
   const dispatch = useDispatch();
+  const theme = useTheme();
+  const location = useLocation();
 
   return (
     <Paper
@@ -27,14 +29,28 @@ const Sidebar = () => {
         flexDirection: "column",
         borderRight: "1px solid",
         borderColor: "divider",
+        bgcolor: "background.paper",
+        transition: "all 0.3s ease",
       }}
     >
-      <Box sx={{p: 3, display: "flex", justifyContent: "flex-start"}}>
+      <Box sx={{p: 3, display: "flex", alignItems: "center", gap: 2}}>
         <img
           src="/public/logo.png"
           alt="App Logo"
-          style={{width: "60px", height: "auto"}}
+          style={{width: "40px", height: "auto"}}
         />
+        <Typography
+          variant="h6"
+          sx={{
+            fontWeight: 600,
+            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+            backgroundClip: "text",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          TalkRoom
+        </Typography>
       </Box>
       <Box component="nav" sx={{mt: 2, flexGrow: 1}}>
         {[
@@ -56,7 +72,25 @@ const Sidebar = () => {
                 px: 3,
                 py: 1.5,
                 borderRadius: 0,
-                "&:hover": {bgcolor: "action.hover"},
+                position: "relative",
+                color:
+                  location.pathname === item.to ? "primary.main" : "inherit",
+                "&:hover": {
+                  bgcolor: "action.hover",
+                  color: "primary.main",
+                },
+                "&::before": {
+                  content: '""',
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: "3px",
+                  bgcolor: "primary.main",
+                  opacity: location.pathname === item.to ? 1 : 0,
+                  transition: "opacity 0.2s",
+                },
+                transition: "all 0.2s",
               }}
             >
               {item.label}
@@ -65,17 +99,24 @@ const Sidebar = () => {
         ))}
       </Box>
 
-      <Box sx={{p: 2, mt: "auto"}}>
+      <Box
+        sx={{p: 2, mt: "auto", borderTop: "1px solid", borderColor: "divider"}}
+      >
         <Button
           fullWidth
           startIcon={<FiLogOut />}
           onClick={() => dispatch(logout())}
           sx={{
             justifyContent: "flex-start",
-            px: 1,
+            px: 3,
             py: 1.5,
-            borderRadius: 0,
-            "&:hover": {bgcolor: "action.hover"},
+            borderRadius: 1,
+            color: "error.main",
+            "&:hover": {
+              bgcolor: "error.light",
+              color: "error.dark",
+            },
+            transition: "all 0.2s",
           }}
         >
           Logout

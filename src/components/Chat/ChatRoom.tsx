@@ -8,8 +8,17 @@ import {
   TextField,
   Box,
   Typography,
+  IconButton,
+  Badge,
 } from "@mui/material";
-import {FiPaperclip, FiSend, FiSmile} from "react-icons/fi";
+import {
+  FiPaperclip,
+  FiSend,
+  FiSmile,
+  FiMoreVertical,
+  FiPhone,
+  FiVideo,
+} from "react-icons/fi";
 import {Sidebar} from "../Layout";
 
 const ChatRoom: React.FC = () => {
@@ -26,6 +35,8 @@ const ChatRoom: React.FC = () => {
       avatar: "/avatars/01.png",
       lastMessage: "Hey, how are you?",
       time: "2m ago",
+      unread: 2,
+      isOnline: true,
     },
     {
       id: 2,
@@ -33,6 +44,8 @@ const ChatRoom: React.FC = () => {
       avatar: "/avatars/02.png",
       lastMessage: "Can we schedule a call?",
       time: "1h ago",
+      unread: 0,
+      isOnline: false,
     },
     {
       id: 3,
@@ -40,6 +53,8 @@ const ChatRoom: React.FC = () => {
       avatar: "/avatars/03.png",
       lastMessage: "The project is ready for review",
       time: "3h ago",
+      unread: 1,
+      isOnline: true,
     },
   ];
 
@@ -50,6 +65,7 @@ const ChatRoom: React.FC = () => {
       content: "Hi there! How's the project coming along?",
       time: "10:30 AM",
       isSent: false,
+      status: "read",
     },
     {
       id: 2,
@@ -58,6 +74,7 @@ const ChatRoom: React.FC = () => {
         "Hey Alice! It's going well. I've just finished the main component.",
       time: "10:32 AM",
       isSent: true,
+      status: "read",
     },
     {
       id: 3,
@@ -65,6 +82,7 @@ const ChatRoom: React.FC = () => {
       content: "That's great news! Can you share a screenshot?",
       time: "10:33 AM",
       isSent: false,
+      status: "read",
     },
     {
       id: 4,
@@ -72,6 +90,7 @@ const ChatRoom: React.FC = () => {
       content: "Sure, I'll send it right away.",
       time: "10:35 AM",
       isSent: true,
+      status: "sent",
     },
   ];
 
@@ -88,8 +107,8 @@ const ChatRoom: React.FC = () => {
           flexGrow: 1,
           display: "flex",
           flexDirection: "column",
-          marginLeft: "240px", // Match sidebar width
-          width: "calc(100% - 240px)", // Adjust width accounting for sidebar
+          marginLeft: "240px",
+          width: "calc(100% - 240px)",
         }}
       >
         {/* Chat Container */}
@@ -99,24 +118,31 @@ const ChatRoom: React.FC = () => {
             <Box
               component="aside"
               sx={{
-                width: 300,
+                width: 320,
                 bgcolor: "background.paper",
                 borderRight: 1,
-                borderColor: "grey.200",
+                borderColor: "divider",
                 height: "100%",
                 position: "fixed",
-                left: 240, // Position after main sidebar
+                left: 240,
                 overflowY: "hidden",
                 display: "flex",
                 flexDirection: "column",
+                boxShadow: 1,
               }}
             >
-              <Box sx={{p: 2}}>
+              <Box sx={{p: 2.5, borderBottom: 1, borderColor: "divider"}}>
                 <TextField
                   fullWidth
-                  placeholder="Search chats..."
+                  placeholder="Search conversations..."
                   variant="outlined"
                   size="small"
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 2,
+                      bgcolor: "grey.50",
+                    },
+                  }}
                 />
               </Box>
               <Box sx={{flexGrow: 1, overflowY: "auto"}}>
@@ -125,19 +151,29 @@ const ChatRoom: React.FC = () => {
                     key={chat.id}
                     sx={{
                       p: 2,
-                      "&:hover": {bgcolor: "grey.50"},
+                      "&:hover": {bgcolor: "action.hover"},
                       cursor: "pointer",
+                      borderBottom: 1,
+                      borderColor: "divider",
+                      transition: "all 0.2s",
                     }}
                   >
                     <Box sx={{display: "flex", alignItems: "center", gap: 2}}>
-                      <Avatar src={chat.avatar} alt={chat.name}>
-                        {chat.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </Avatar>
+                      <Badge
+                        overlap="circular"
+                        anchorOrigin={{vertical: "bottom", horizontal: "right"}}
+                        variant="dot"
+                        color={chat.isOnline ? "success" : "default"}
+                      >
+                        <Avatar src={chat.avatar} alt={chat.name}>
+                          {chat.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </Avatar>
+                      </Badge>
                       <Box sx={{flexGrow: 1, minWidth: 0}}>
-                        <Typography variant="subtitle2" noWrap>
+                        <Typography variant="subtitle1" fontWeight={500} noWrap>
                           {chat.name}
                         </Typography>
                         <Typography
@@ -148,9 +184,24 @@ const ChatRoom: React.FC = () => {
                           {chat.lastMessage}
                         </Typography>
                       </Box>
-                      <Typography variant="caption" color="text.secondary">
-                        {chat.time}
-                      </Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "flex-end",
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          {chat.time}
+                        </Typography>
+                        {chat.unread > 0 && (
+                          <Badge
+                            badgeContent={chat.unread}
+                            color="primary"
+                            sx={{mt: 0.5}}
+                          />
+                        )}
+                      </Box>
                     </Box>
                   </Box>
                 ))}
@@ -164,7 +215,8 @@ const ChatRoom: React.FC = () => {
                 flexGrow: 1,
                 display: "flex",
                 flexDirection: "column",
-                marginLeft: "300px", // Match chat sidebar width
+                marginLeft: "320px",
+                bgcolor: "grey.50",
               }}
             >
               {/* Chat Header */}
@@ -173,25 +225,53 @@ const ChatRoom: React.FC = () => {
                 sx={{
                   bgcolor: "background.paper",
                   borderBottom: 1,
-                  borderColor: "grey.200",
+                  borderColor: "divider",
                   p: 2,
                   display: "flex",
                   alignItems: "center",
+                  justifyContent: "space-between",
+                  boxShadow: 1,
                 }}
               >
-                <Avatar src="/avatars/01.png" alt="Alice Johnson">
-                  AJ
-                </Avatar>
-                <Box sx={{ml: 2}}>
-                  <Typography variant="h6">Alice Johnson</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Online
-                  </Typography>
+                <Box sx={{display: "flex", alignItems: "center", gap: 2}}>
+                  <Badge
+                    overlap="circular"
+                    anchorOrigin={{vertical: "bottom", horizontal: "right"}}
+                    variant="dot"
+                    color="success"
+                  >
+                    <Avatar
+                      src="/avatars/01.png"
+                      alt="Alice Johnson"
+                      sx={{width: 48, height: 48}}
+                    >
+                      AJ
+                    </Avatar>
+                  </Badge>
+                  <Box>
+                    <Typography variant="h6" fontWeight={600}>
+                      Alice Johnson
+                    </Typography>
+                    <Typography variant="body2" color="success.main">
+                      Online
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{display: "flex", gap: 1}}>
+                  <IconButton color="primary">
+                    <FiPhone />
+                  </IconButton>
+                  <IconButton color="primary">
+                    <FiVideo />
+                  </IconButton>
+                  <IconButton>
+                    <FiMoreVertical />
+                  </IconButton>
                 </Box>
               </Box>
 
               {/* Messages */}
-              <Box sx={{flexGrow: 1, p: 2, overflowY: "auto"}}>
+              <Box sx={{flexGrow: 1, p: 3, overflowY: "auto"}}>
                 {messages.map((message) => (
                   <Box
                     key={message.id}
@@ -204,14 +284,18 @@ const ChatRoom: React.FC = () => {
                     }}
                   >
                     <Card
+                      elevation={0}
                       sx={{
                         maxWidth: "70%",
-                        bgcolor: message.isSent ? "primary.main" : "grey.100",
+                        bgcolor: message.isSent
+                          ? "primary.main"
+                          : "background.paper",
+                        borderRadius: 3,
                       }}
                     >
-                      <CardContent>
+                      <CardContent sx={{pb: "12px !important"}}>
                         <Typography
-                          variant="body2"
+                          variant="body1"
                           color={
                             message.isSent
                               ? "primary.contrastText"
@@ -220,17 +304,35 @@ const ChatRoom: React.FC = () => {
                         >
                           {message.content}
                         </Typography>
-                        <Typography
-                          variant="caption"
-                          color={
-                            message.isSent
-                              ? "primary.contrastText"
-                              : "text.secondary"
-                          }
-                          sx={{mt: 1, opacity: 0.7}}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            mt: 0.5,
+                          }}
                         >
-                          {message.time}
-                        </Typography>
+                          <Typography
+                            variant="caption"
+                            color={
+                              message.isSent
+                                ? "primary.contrastText"
+                                : "text.secondary"
+                            }
+                            sx={{opacity: 0.8}}
+                          >
+                            {message.time}
+                          </Typography>
+                          {message.isSent && (
+                            <Typography
+                              variant="caption"
+                              color="primary.contrastText"
+                              sx={{opacity: 0.8}}
+                            >
+                              • {message.status}
+                            </Typography>
+                          )}
+                        </Box>
                       </CardContent>
                     </Card>
                   </Box>
@@ -242,24 +344,41 @@ const ChatRoom: React.FC = () => {
                 sx={{
                   bgcolor: "background.paper",
                   borderTop: 1,
-                  borderColor: "grey.200",
+                  borderColor: "divider",
                   p: 2,
+                  boxShadow: "0 -2px 10px rgba(0,0,0,0.05)",
                 }}
               >
-                <Box sx={{display: "flex", alignItems: "center", gap: 1}}>
-                  <Button variant="outlined" size="small">
+                <Box sx={{display: "flex", alignItems: "center", gap: 1.5}}>
+                  <IconButton color="primary" size="medium">
                     <FiPaperclip />
-                  </Button>
+                  </IconButton>
                   <TextField
                     fullWidth
-                    placeholder="Type a message..."
+                    placeholder="Type your message..."
                     variant="outlined"
                     size="small"
+                    multiline
+                    maxRows={4}
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: 3,
+                        bgcolor: "grey.50",
+                      },
+                    }}
                   />
-                  <Button variant="outlined" size="small">
+                  <IconButton color="primary" size="medium">
                     <FiSmile />
-                  </Button>
-                  <Button variant="contained" startIcon={<FiSend />}>
+                  </IconButton>
+                  <Button
+                    variant="contained"
+                    endIcon={<FiSend />}
+                    sx={{
+                      borderRadius: 2,
+                      px: 3,
+                      py: 1,
+                    }}
+                  >
                     Send
                   </Button>
                 </Box>
