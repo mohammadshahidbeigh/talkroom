@@ -48,10 +48,6 @@ const Dashboard = () => {
             Welcome back, {user?.name || "Guest"}!
           </Typography>
 
-          <Typography variant="h4" sx={{mb: 4, fontWeight: "bold"}}>
-            Welcome back!
-          </Typography>
-
           <Grid container spacing={3}>
             {[
               {

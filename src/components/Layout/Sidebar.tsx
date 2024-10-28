@@ -1,6 +1,6 @@
 // client/src/components/Layout/Sidebar.tsx
 import {Link} from "react-router-dom";
-import {Box, Button, Paper, Avatar} from "@mui/material";
+import {Box, Button, Paper} from "@mui/material";
 import {
   FiBarChart,
   FiMessageCircle,
@@ -10,12 +10,9 @@ import {
 } from "react-icons/fi";
 import {useDispatch} from "react-redux";
 import {logout} from "../../store/slices/authSlice";
-import {useSelector} from "react-redux";
-import {RootState} from "../../store";
 
 const Sidebar = () => {
   const dispatch = useDispatch();
-  const user = useSelector((state: RootState) => state.auth.user);
 
   return (
     <Paper
@@ -70,15 +67,18 @@ const Sidebar = () => {
 
       <Box sx={{p: 2, mt: "auto"}}>
         <Button
-          variant="outlined"
           fullWidth
-          startIcon={
-            <Avatar src="/avatars/01.png" sx={{width: 24, height: 24}} />
-          }
-          endIcon={<FiLogOut />}
+          startIcon={<FiLogOut />}
           onClick={() => dispatch(logout())}
+          sx={{
+            justifyContent: "flex-start",
+            px: 1,
+            py: 1.5,
+            borderRadius: 0,
+            "&:hover": {bgcolor: "action.hover"},
+          }}
         >
-          {user?.name || "User"}
+          Logout
         </Button>
       </Box>
     </Paper>
