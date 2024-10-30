@@ -1,0 +1,77 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  username        String    @unique
+  fullName        String
+  hashedPassword  String
+  avatarUrl       String?
+  status          String    @default("online")
+  provider        String?
+  providerId      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  googleId        String?   @unique
+  githubId        String?   @unique
+  sentMessages    Message[]
+  participants    Participant[]
+  roomParticipants VideoRoomParticipant[]
+
+  @@unique([provider, providerId])
+}
+
+model Chat {
+  id           String    @id @default(uuid())
+  name         String?
+  type         String    @default("direct")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  messages     Message[]
+  participants Participant[]
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  content   String
+  type      String   @default("text")
+  senderId  String
+  chatId    String
+  createdAt DateTime @default(now())
+  sender    User     @relation(fields: [senderId], references: [id])
+  chat      Chat     @relation(fields: [chatId], references: [id])
+}
+
+model Participant {
+  id        String   @id @default(uuid())
+  userId    String
+  chatId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  chat      Chat     @relation(fields: [chatId], references: [id])
+}
+
+model VideoRoom {
+  id           String    @id @default(uuid())
+  createdAt    DateTime  @default(now())
+  endedAt      DateTime?
+  participants VideoRoomParticipant[]
+}
+
+model VideoRoomParticipant {
+  id       String    @id @default(uuid())
+  roomId   String
+  userId   String
+  status   String    @default("joined")
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+  room     VideoRoom @relation(fields: [roomId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
+}
