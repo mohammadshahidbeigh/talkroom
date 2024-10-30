@@ -7,6 +7,7 @@ import userRoutes from "./routes/user";
 import initializeSocket from "./services/socket";
 import {initializeWebRTC} from "./services/webrtc";
 import {PrismaClient} from "@prisma/client";
+import {testRedisConnection} from "./services/redis";
 
 const app = express();
 const server = http.createServer(app);
@@ -21,6 +22,17 @@ app.use("/user", userRoutes);
 
 initializeSocket(server);
 initializeWebRTC(io);
+
+// Test Redis connection on startup
+testRedisConnection()
+  .then((success) => {
+    if (success) {
+      console.log("Redis test successful");
+    } else {
+      console.log("Redis test failed");
+    }
+  })
+  .catch(console.error);
 
 const PORT = process.env.PORT || 5000;
 
