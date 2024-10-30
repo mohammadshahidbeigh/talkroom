@@ -4,21 +4,19 @@ import bcrypt from "bcryptjs";
 import prisma from "../models";
 import config from "../config/default";
 
+// Register
 export const register = async (req: Request, res: Response) => {
   const {username, email, password, fullName} = req.body;
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Explicitly type the data object
-  const userData = {
-    username,
-    email,
-    fullName,
-    hashedPassword,
-    status: "online" as const,
-  };
-
   const user = await prisma.user.create({
-    data: userData,
+    data: {
+      username,
+      email,
+      fullName,
+      hashedPassword,
+      status: "online",
+    },
     select: {
       id: true,
       email: true,
@@ -34,6 +32,7 @@ export const register = async (req: Request, res: Response) => {
   res.json(user);
 };
 
+// Login
 export const login = async (req: Request, res: Response) => {
   const {username, password} = req.body;
   const user = await prisma.user.findUnique({
@@ -55,9 +54,23 @@ export const login = async (req: Request, res: Response) => {
 
   const token = jwt.sign({userId: user.id}, config.jwtSecret as string);
 
-  // Remove hashedPassword from response using object destructuring
-  const userWithoutPassword = Object.fromEntries(
-    Object.entries(user).filter(([key]) => key !== "hashedPassword")
-  );
-  res.json({token, user: userWithoutPassword});
+  res.json({token, user: {...user, hashedPassword: undefined}});
+};
+
+// Update User
+export const updateUser = async (req: Request, res: Response) => {
+  const {username, email, fullName} = req.body;
+  const updatedUser = await prisma.user.update({
+    where: {id: req.user!.id},
+    data: {username, email, fullName},
+  });
+  res.json(updatedUser);
+};
+
+// Delete User
+export const deleteUser = async (req: Request, res: Response) => {
+  await prisma.user.delete({
+    where: {id: req.user!.id},
+  });
+  res.status(204).send();
 };
