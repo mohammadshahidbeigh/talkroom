@@ -34,9 +34,9 @@ export const register = async (req: Request, res: Response) => {
 
 // Login
 export const login = async (req: Request, res: Response) => {
-  const {username, password} = req.body;
+  const {email, password} = req.body;
   const user = await prisma.user.findUnique({
-    where: {username},
+    where: {email},
     select: {
       id: true,
       username: true,
