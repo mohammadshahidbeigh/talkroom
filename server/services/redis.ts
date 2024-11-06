@@ -17,7 +17,7 @@ redis.on("error", (error) => {
 // Test function
 export const testRedisConnection = async () => {
   try {
-    await redis.set("test_key", "Hello Redis!");
+    await redis.set("test_key", "Hello Redis! How are you?");
     const value = await redis.get("test_key");
     console.log("Redis test value:", value);
     return true;

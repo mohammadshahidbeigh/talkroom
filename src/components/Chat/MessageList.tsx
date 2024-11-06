@@ -1,5 +1,5 @@
 // client/src/components/Chat/MessageList.tsx
-import React, {useEffect, useState} from "react";
+import {useEffect, useState} from "react";
 import {useSocket} from "../../contexts/SocketContext";
 
 const MessageList = () => {
