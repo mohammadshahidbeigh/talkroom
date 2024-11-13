@@ -1,10 +1,9 @@
-import {Request, Response, NextFunction} from "express";
+import {Request, Response} from "express";
 
 export const errorHandler = (
-  err: any,
+  err: SyntaxError | Error,
   req: Request,
-  res: Response,
-  next: NextFunction
+  res: Response
 ) => {
   // Handle JSON parsing errors
   if (err instanceof SyntaxError && "body" in err) {
