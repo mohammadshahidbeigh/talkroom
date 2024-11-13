@@ -1,4 +1,4 @@
-# TalkRoom - Real-Time Chat Application
+a# TalkRoom - Real-Time Chat Application
 
 A modern real-time chat application built with React, TypeScript, Node.js, and WebSocket technology.
 
@@ -12,6 +12,24 @@ A modern real-time chat application built with React, TypeScript, Node.js, and W
 - Modern and responsive UI
 
 ## Tech Stack
+
+Backend (Node.js + Express):
+
+
+REST API setup with JWT authentication
+WebSocket integration using Socket.IO
+PostgreSQL connection using Prisma ORM
+Redis integration for caching
+WebRTC signaling server setup
+
+
+Frontend (React):
+
+
+Material UI integration
+Socket.IO client setup
+WebRTC peer connection implementation
+Basic routing and authentication flow
 
 ### Frontend
 
