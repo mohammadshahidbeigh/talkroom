@@ -83,7 +83,7 @@ const Dashboard = () => {
               paddingBottom: 1,
             }}
           >
-            Welcome back, {user?.name || "Guest"}!
+            Welcome back, {user?.fullName || "Guest"}!
           </Typography>
 
           <Grid container spacing={3}>

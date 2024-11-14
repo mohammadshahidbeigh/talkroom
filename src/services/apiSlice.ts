@@ -17,6 +17,11 @@ const BASE_URL = "http://localhost:5000";
 // Define tag types
 type TagTypes = "Messages";
 
+interface UpdatePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export const apiSlice = createApi({
   reducerPath: "api",
   tagTypes: ["Messages"] as const,
@@ -114,6 +119,15 @@ export const apiSlice = createApi({
     getAvailableUsers: builder.query<User[], void>({
       query: () => "/user/available",
     }),
+
+    // Password endpoints
+    updatePassword: builder.mutation<void, UpdatePasswordPayload>({
+      query: (data) => ({
+        url: "/auth/password",
+        method: "PUT",
+        body: data,
+      }),
+    }),
   }),
 });
 
@@ -130,4 +144,5 @@ export const {
   useSendMessageMutation,
   useDeleteMessageMutation,
   useGetAvailableUsersQuery,
+  useUpdatePasswordMutation,
 } = apiSlice;

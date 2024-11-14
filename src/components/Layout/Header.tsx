@@ -19,8 +19,8 @@ import {logout} from "../../store/slices/authSlice";
 import useAppSelector from "../../hooks/useAppSelector";
 
 interface User {
-  name?: string;
-  avatar?: string;
+  fullName?: string;
+  avatarUrl?: string;
 }
 
 const Header = () => {
@@ -98,8 +98,8 @@ const Header = () => {
 
         <Tooltip title="Profile">
           <Avatar
-            src={user?.avatar}
-            alt={user?.name || "User"}
+            src={user?.avatarUrl}
+            alt={user?.fullName || "User"}
             sx={{
               cursor: "pointer",
               transition: "transform 0.2s",

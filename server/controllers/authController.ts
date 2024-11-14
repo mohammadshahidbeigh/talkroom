@@ -92,3 +92,48 @@ export const deleteUser = async (req: Request, res: Response) => {
   });
   res.status(204).send();
 };
+
+export const updatePassword = async (req: Request, res: Response) => {
+  try {
+    const {currentPassword, newPassword} = req.body;
+
+    // Get user with password
+    const user = await prisma.user.findUnique({
+      where: {id: req.user!.id},
+      select: {
+        id: true,
+        hashedPassword: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({error: "User not found"});
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.hashedPassword
+    );
+
+    if (!isPasswordValid) {
+      return res.status(401).json({error: "Current password is incorrect"});
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await prisma.user.update({
+      where: {id: user.id},
+      data: {
+        hashedPassword,
+      },
+    });
+
+    res.json({message: "Password updated successfully"});
+  } catch (error) {
+    console.error("Update password error:", error);
+    res.status(500).json({error: "Failed to update password"});
+  }
+};

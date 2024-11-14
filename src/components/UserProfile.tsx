@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useState} from "react";
 import {
   Avatar,
   Box,
@@ -9,13 +9,18 @@ import {
   Grid,
   Input,
   Switch,
-  Tab,
-  Tabs,
   Typography,
+  TextField,
+  Snackbar,
+  Alert,
 } from "@mui/material";
+import {FiLock, FiSave} from "react-icons/fi";
 import {Sidebar} from "./Layout";
 import useAppSelector from "../hooks/useAppSelector";
-import {useUpdateUserMutation} from "../services/apiSlice";
+import {
+  useUpdateUserMutation,
+  useUpdatePasswordMutation,
+} from "../services/apiSlice";
 import {uploadFile} from "../services/api";
 import useAppDispatch from "../hooks/useAppDispatch";
 import {updateUser as updateAuthUser} from "../store/slices/authSlice";
@@ -27,13 +32,30 @@ interface UserProfileProps {
   avatar?: string;
 }
 
+interface NotificationState {
+  open: boolean;
+  message: string;
+  severity: "success" | "error" | "info" | "warning";
+}
+
 const UserProfile: React.FC<UserProfileProps> = () => {
-  const [tabValue, setTabValue] = React.useState(0);
   const user = useAppSelector((state) => state.auth.user);
   const [updateUser] = useUpdateUserMutation();
   const [isLoading, setIsLoading] = React.useState(false);
   const dispatch = useAppDispatch();
   const darkMode = useAppSelector((state) => state.settings.darkMode);
+  const [updatePassword] = useUpdatePasswordMutation();
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [showPasswordFields, setShowPasswordFields] = useState(false);
+  const [notification, setNotification] = useState<NotificationState>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   const [profileData, setProfileData] = React.useState({
     username: user?.username || "",
@@ -53,10 +75,6 @@ const UserProfile: React.FC<UserProfileProps> = () => {
       });
     }
   }, [user]);
-
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
 
   const handleAvatarChange = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -161,6 +179,56 @@ const UserProfile: React.FC<UserProfileProps> = () => {
 
   const handleDarkModeToggle = () => {
     dispatch(toggleDarkMode());
+  };
+
+  const handlePasswordChange = async () => {
+    try {
+      // Validate passwords
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        setNotification({
+          open: true,
+          message: "New passwords don't match",
+          severity: "error",
+        });
+        return;
+      }
+
+      if (passwordData.newPassword.length < 6) {
+        setNotification({
+          open: true,
+          message: "Password must be at least 6 characters long",
+          severity: "error",
+        });
+        return;
+      }
+
+      await updatePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      }).unwrap();
+
+      // Reset password fields
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setShowPasswordFields(false);
+
+      setNotification({
+        open: true,
+        message: "Password updated successfully",
+        severity: "success",
+      });
+    } catch (error) {
+      console.error("Failed to update password:", error);
+      setNotification({
+        open: true,
+        message:
+          "Failed to update password. Please check your current password.",
+        severity: "error",
+      });
+    }
   };
 
   if (!user) {
@@ -335,67 +403,135 @@ const UserProfile: React.FC<UserProfileProps> = () => {
               </Card>
             </Grid>
 
-            <Grid item xs={12}>
+            <Grid item xs={12} md={6}>
               <Card>
-                <CardHeader
-                  title="Security"
-                  subheader="Manage your account security settings."
-                />
+                <CardHeader title="Security" subheader="Update your password" />
                 <CardContent>
-                  <Tabs value={tabValue} onChange={handleTabChange}>
-                    <Tab label="Change Password" />
-                    <Tab label="Two-Factor Authentication" />
-                  </Tabs>
-
-                  {tabValue === 0 && (
-                    <Box
-                      sx={{
-                        mt: 3,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 3,
-                      }}
-                    >
-                      <Box>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Current Password
-                        </Typography>
-                        <Input fullWidth type="password" />
-                      </Box>
-
-                      <Box>
-                        <Typography variant="subtitle2" gutterBottom>
-                          New Password
-                        </Typography>
-                        <Input fullWidth type="password" />
-                      </Box>
-
-                      <Box>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Confirm New Password
-                        </Typography>
-                        <Input fullWidth type="password" />
-                      </Box>
-
-                      <Button variant="contained">Update Password</Button>
-                    </Box>
-                  )}
-
-                  {tabValue === 1 && (
-                    <Box sx={{mt: 3}}>
-                      <Typography paragraph>
-                        Two-factor authentication adds an extra layer of
-                        security to your account.
-                      </Typography>
-                      <Button variant="contained">Enable 2FA</Button>
-                    </Box>
-                  )}
+                  <Box sx={{display: "flex", flexDirection: "column", gap: 2}}>
+                    {!showPasswordFields ? (
+                      <Button
+                        variant="outlined"
+                        onClick={() => setShowPasswordFields(true)}
+                        startIcon={<FiLock />}
+                      >
+                        Change Password
+                      </Button>
+                    ) : (
+                      <>
+                        <TextField
+                          type="password"
+                          label="Current Password"
+                          value={passwordData.currentPassword}
+                          onChange={(e) =>
+                            setPasswordData((prev) => ({
+                              ...prev,
+                              currentPassword: e.target.value,
+                            }))
+                          }
+                          fullWidth
+                          required
+                          autoFocus
+                          variant="outlined"
+                        />
+                        <TextField
+                          type="password"
+                          label="New Password"
+                          value={passwordData.newPassword}
+                          onChange={(e) =>
+                            setPasswordData((prev) => ({
+                              ...prev,
+                              newPassword: e.target.value,
+                            }))
+                          }
+                          fullWidth
+                          required
+                          variant="outlined"
+                          helperText="Password must be at least 8 characters long"
+                        />
+                        <TextField
+                          type="password"
+                          label="Confirm New Password"
+                          value={passwordData.confirmPassword}
+                          onChange={(e) =>
+                            setPasswordData((prev) => ({
+                              ...prev,
+                              confirmPassword: e.target.value,
+                            }))
+                          }
+                          fullWidth
+                          required
+                          variant="outlined"
+                          error={
+                            passwordData.newPassword !==
+                            passwordData.confirmPassword
+                          }
+                          helperText={
+                            passwordData.newPassword !==
+                            passwordData.confirmPassword
+                              ? "Passwords don't match"
+                              : ""
+                          }
+                        />
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 2,
+                            justifyContent: "flex-end",
+                            mt: 2,
+                          }}
+                        >
+                          <Button
+                            onClick={() => {
+                              setShowPasswordFields(false);
+                              setPasswordData({
+                                currentPassword: "",
+                                newPassword: "",
+                                confirmPassword: "",
+                              });
+                            }}
+                            color="inherit"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="contained"
+                            onClick={handlePasswordChange}
+                            disabled={
+                              !passwordData.currentPassword ||
+                              !passwordData.newPassword ||
+                              !passwordData.confirmPassword ||
+                              passwordData.newPassword !==
+                                passwordData.confirmPassword ||
+                              passwordData.newPassword.length < 8
+                            }
+                            startIcon={<FiSave />}
+                          >
+                            Update Password
+                          </Button>
+                        </Box>
+                      </>
+                    )}
+                  </Box>
                 </CardContent>
               </Card>
             </Grid>
           </Grid>
         </Box>
       </Box>
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={() => setNotification((prev) => ({...prev, open: false}))}
+        anchorOrigin={{vertical: "top", horizontal: "center"}}
+      >
+        <Alert
+          onClose={() => setNotification((prev) => ({...prev, open: false}))}
+          severity={notification.severity}
+          sx={{width: "100%"}}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
