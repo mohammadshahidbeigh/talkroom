@@ -6,9 +6,10 @@ import chatRoutes from "./routes/chat";
 import userRoutes from "./routes/user";
 import videoRoutes from "./routes/video";
 import messageRoutes from "./routes/message";
+import uploadRoutes from "./routes/upload";
 import initializeSocket from "./services/socket";
 import {initializeWebRTC} from "./services/webrtc";
-import {PrismaClient} from "@prisma/client";
+import {PrismaClient} from ".prisma/client";
 import {testRedisConnection} from "./services/redis";
 import cors from "cors";
 
@@ -25,11 +26,16 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
+// Register routes
 app.use("/auth", authRoutes);
 app.use("/chat", chatRoutes);
 app.use("/user", userRoutes);
 app.use("/video", videoRoutes);
 app.use("/message", messageRoutes);
+
+// File upload and download routes
+app.use("/upload", uploadRoutes);
+app.get("/uploads/:id/:filename", uploadRoutes);
 
 // Error handling middleware for JSON parsing errors
 const jsonErrorHandler: ErrorRequestHandler = (err, req, res, next) => {

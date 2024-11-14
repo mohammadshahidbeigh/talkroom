@@ -1,25 +1,20 @@
-import { Router, Request, Response } from "express";
+import {Router} from "express";
 import {
   getChats,
   createChat,
   updateChat,
   deleteChat,
 } from "../controllers/chatController";
-import { auth } from "../middleware/auth";
+import {auth} from "../middleware/auth";
+import {RequestHandler} from "express";
 
 const router = Router();
 
-router.get("/", auth, async (req: Request, res: Response) => {
-  await getChats(req, res);
-});
-router.post("/", auth, async (req: Request, res: Response) => {
-  await createChat(req, res);
-});
-router.put("/:id", auth, async (req: Request, res: Response) => {
-  await updateChat(req, res);
-});
-router.delete("/:id", auth, async (req: Request, res: Response) => {
-  await deleteChat(req, res);
-});
+router.use(auth);
+
+router.get("/", getChats as RequestHandler);
+router.post("/", createChat as RequestHandler);
+router.put("/:id", updateChat as RequestHandler);
+router.delete("/:id", deleteChat as RequestHandler);
 
 export default router;

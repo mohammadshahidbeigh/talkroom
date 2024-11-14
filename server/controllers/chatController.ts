@@ -5,24 +5,37 @@ import {Prisma} from "@prisma/client";
 export const getChats = async (req: Request, res: Response) => {
   try {
     const chats = await prisma.chat.findMany({
-      where: {participants: {some: {userId: req.user!.id}}},
-      include: {
+      where: {
         participants: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                email: true,
-              },
-            },
+          some: {
+            userId: req.user!.id,
           },
         },
       },
+      include: {
+        participants: {
+          include: {
+            user: true,
+          },
+        },
+        messages: {
+          include: {
+            sender: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1, // Get only the last message
+        },
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
     });
+
     res.json(chats);
   } catch (error) {
-    console.error("Get chats error:", error);
+    console.error("Error fetching chats:", error);
     res.status(500).json({error: "Failed to fetch chats"});
   }
 };
@@ -39,21 +52,75 @@ export const createChat = async (req: Request, res: Response) => {
       });
     }
 
-    // Verify all participants exist
-    const users = await prisma.user.findMany({
-      where: {
-        id: {
-          in: participants,
+    // For direct messages, check if a chat already exists between these users
+    if (type === "direct" && participants.length === 1) {
+      const existingChat = await prisma.chat.findFirst({
+        where: {
+          type: "direct",
+          AND: [
+            {
+              participants: {
+                some: {
+                  userId: req.user!.id,
+                },
+              },
+            },
+            {
+              participants: {
+                some: {
+                  userId: participants[0],
+                },
+              },
+            },
+          ],
         },
-      },
-    });
-
-    if (users.length !== participants.length) {
-      return res.status(400).json({
-        error: "One or more participant IDs are invalid",
+        include: {
+          participants: {
+            include: {
+              user: true,
+            },
+          },
+        },
       });
+
+      if (existingChat) {
+        // Check if the current user is still a participant
+        const isParticipant = existingChat.participants.some(
+          (p) => p.userId === req.user!.id
+        );
+
+        if (!isParticipant) {
+          // Re-add the user as a participant
+          await prisma.participant.create({
+            data: {
+              userId: req.user!.id,
+              chatId: existingChat.id,
+            },
+          });
+
+          // Return the updated chat
+          const updatedChat = await prisma.chat.findUnique({
+            where: {id: existingChat.id},
+            include: {
+              participants: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          });
+
+          return res.json(updatedChat);
+        }
+
+        return res.status(400).json({
+          error: "A direct message chat already exists with this user",
+          existingChat,
+        });
+      }
     }
 
+    // Create new chat if no existing chat found
     const chat = await prisma.chat.create({
       data: {
         name,
@@ -79,6 +146,7 @@ export const createChat = async (req: Request, res: Response) => {
         },
       },
     });
+
     res.json(chat);
   } catch (error) {
     console.error("Create chat error:", error);
@@ -158,8 +226,8 @@ export const deleteChat = async (req: Request, res: Response) => {
   try {
     const {id} = req.params;
 
-    // Verify user has permission to delete this chat
-    const chatExists = await prisma.chat.findFirst({
+    // Check if chat exists and user is a participant
+    const chat = await prisma.chat.findFirst({
       where: {
         id,
         participants: {
@@ -168,33 +236,60 @@ export const deleteChat = async (req: Request, res: Response) => {
           },
         },
       },
+      include: {
+        participants: true,
+      },
     });
 
-    if (!chatExists) {
-      return res.status(404).json({error: "Chat not found or access denied"});
+    if (!chat) {
+      return res.status(404).json({error: "Chat not found"});
     }
 
-    // Delete in transaction to ensure both operations succeed or fail together
-    await prisma.$transaction(async (tx) => {
-      // First delete all participants
-      await tx.participant.deleteMany({
-        where: {chatId: id},
-      });
-
-      // Then delete the chat
-      await tx.chat.delete({
-        where: {id},
-      });
+    // Find and delete the participant record
+    const participant = await prisma.participant.findFirst({
+      where: {
+        AND: [{chatId: id}, {userId: req.user!.id}],
+      },
     });
 
-    res.status(204).send();
+    if (participant) {
+      await prisma.participant.delete({
+        where: {
+          id: participant.id,
+        },
+      });
+
+      // Get user info for the system message
+      const user = await prisma.user.findUnique({
+        where: {id: req.user!.id},
+        select: {username: true},
+      });
+
+      // Return the username for the socket event
+      res.json({
+        success: true,
+        chatId: id,
+        userId: req.user!.id,
+        username: user?.username || "User",
+      });
+    }
+
+    // If this was the last participant, then delete the entire chat
+    if (chat.participants.length === 1) {
+      await prisma.$transaction(async (tx) => {
+        // Delete all messages first
+        await tx.message.deleteMany({
+          where: {chatId: id},
+        });
+
+        // Delete the chat
+        await tx.chat.delete({
+          where: {id},
+        });
+      });
+    }
   } catch (error) {
     console.error("Delete chat error:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2025") {
-        return res.status(404).json({error: "Chat not found"});
-      }
-    }
     res.status(500).json({error: "Failed to delete chat"});
   }
 };

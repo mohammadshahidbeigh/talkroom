@@ -1,15 +1,19 @@
 import {Router} from "express";
 import {
-  sendMessage,
   getMessages,
+  sendMessage,
   deleteMessage,
 } from "../controllers/messageController";
 import {auth} from "../middleware/auth";
+import {RequestHandler} from "express";
 
 const router = Router();
 
-router.post("/", auth, sendMessage); // Send a message
-router.get("/:chatId", auth, getMessages); // Get all messages for a chat
-router.delete("/:id", auth, deleteMessage); // Delete a message by ID
+// Apply auth middleware to all message routes
+router.use(auth);
+
+router.get("/:chatId", getMessages as RequestHandler);
+router.post("/", sendMessage as RequestHandler);
+router.delete("/:id", deleteMessage as RequestHandler);
 
 export default router;

@@ -24,6 +24,7 @@ model User {
   sentMessages    Message[]
   participants    Participant[]
   roomParticipants VideoRoomParticipant[]
+  files           File[]
 
   @@unique([provider, providerId])
 }
@@ -47,6 +48,7 @@ model Message {
   createdAt DateTime @default(now())
   sender    User     @relation(fields: [senderId], references: [id])
   chat      Chat     @relation(fields: [chatId], references: [id])
+  files     File[]
 }
 
 model Participant {
@@ -74,4 +76,17 @@ model VideoRoomParticipant {
   leftAt   DateTime?
   room     VideoRoom @relation(fields: [roomId], references: [id])
   user     User      @relation(fields: [userId], references: [id])
+}
+
+model File {
+  id          String   @id @default(uuid())
+  filename    String
+  mimetype    String
+  data        Bytes    // This will store the file content
+  size        Int
+  uploadedBy  String
+  createdAt   DateTime @default(now())
+  messageId   String?
+  message     Message? @relation(fields: [messageId], references: [id])
+  user        User     @relation(fields: [uploadedBy], references: [id])
 }

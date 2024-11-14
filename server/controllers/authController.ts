@@ -45,6 +45,8 @@ export const login = async (req: Request, res: Response) => {
       fullName: true,
       status: true,
       avatarUrl: true,
+      createdAt: true,
+      updatedAt: true,
     },
   });
 
@@ -54,15 +56,31 @@ export const login = async (req: Request, res: Response) => {
 
   const token = jwt.sign({userId: user.id}, config.jwtSecret as string);
 
-  res.json({token, user: {...user, hashedPassword: undefined}});
+  const {...userWithoutPassword} = user;
+  res.json({token, user: userWithoutPassword});
 };
 
 // Update User
 export const updateUser = async (req: Request, res: Response) => {
-  const {username, email, fullName} = req.body;
+  const {username, email, fullName, avatarUrl} = req.body;
   const updatedUser = await prisma.user.update({
     where: {id: req.user!.id},
-    data: {username, email, fullName},
+    data: {
+      username,
+      email,
+      fullName,
+      avatarUrl,
+    },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      fullName: true,
+      status: true,
+      avatarUrl: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   });
   res.json(updatedUser);
 };

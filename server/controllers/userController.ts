@@ -73,9 +73,8 @@ export const getAvailableUsers = async (req: Request, res: Response) => {
   try {
     const users = await prisma.user.findMany({
       where: {
-        // Exclude the current user
-        id: {
-          not: req.user!.id,
+        NOT: {
+          id: req.user!.id, // Exclude current user
         },
       },
       select: {
@@ -85,14 +84,11 @@ export const getAvailableUsers = async (req: Request, res: Response) => {
         avatarUrl: true,
         status: true,
       },
-      orderBy: {
-        fullName: "asc",
-      },
     });
 
     res.json(users);
   } catch (error) {
-    console.error("Get available users error:", error);
-    res.status(500).json({error: "Error fetching available users"});
+    console.error("Error fetching available users:", error);
+    res.status(500).json({error: "Failed to fetch users"});
   }
 };

@@ -1,27 +1,137 @@
 // client/src/services/api.ts
-import {createApi, fetchBaseQuery} from "@reduxjs/toolkit/query/react";
+import axios, {InternalAxiosRequestConfig} from "axios";
+import {User, Chat, Message} from "../types";
 
-interface Item {
-  id: string;
-  name: string;
-  // Add other properties as needed
-}
+const BASE_URL = "http://localhost:5000";
 
-export const api = createApi({
-  reducerPath: "api",
-  baseQuery: fetchBaseQuery({baseUrl: "/api"}),
-  endpoints: (builder) => ({
-    getItems: builder.query<Item[], void>({
-      query: () => "items",
-    }),
-    addItem: builder.mutation<Item, Partial<Item>>({
-      query: (body) => ({
-        url: "items",
-        method: "POST",
-        body,
-      }),
-    }),
-  }),
+const api = axios.create({
+  baseURL: BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
-export const {useGetItemsQuery, useAddItemMutation} = api;
+// Types for request payloads
+interface RegisterPayload {
+  username: string;
+  email: string;
+  password: string;
+  fullName: string;
+}
+
+interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+interface UpdateUserPayload {
+  username?: string;
+  email?: string;
+  fullName?: string;
+  avatarUrl?: string;
+}
+
+interface CreateChatPayload {
+  name: string;
+  type: string;
+  participants: string[];
+}
+
+interface UpdateChatPayload {
+  name?: string;
+  type?: string;
+}
+
+interface SendMessagePayload {
+  chatId: string;
+  content: string;
+  type: string;
+}
+
+interface UploadError extends Error {
+  response?: {
+    data?: unknown;
+  };
+}
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+export const authApi = {
+  register: (data: RegisterPayload) =>
+    api.post<{token: string; user: User}>("/auth/register", data),
+  login: (data: LoginPayload) =>
+    api.post<{token: string; user: User}>("/auth/login", data),
+  updateUser: (data: UpdateUserPayload) => api.put<User>("/auth/update", data),
+  deleteUser: () => api.delete("/auth/delete"),
+};
+
+export const chatApi = {
+  getChats: () => api.get<Chat[]>("/chat"),
+  createChat: (data: CreateChatPayload) => api.post<Chat>("/chat", data),
+  updateChat: (id: string, data: UpdateChatPayload) =>
+    api.put<Chat>(`/chat/${id}`, data),
+  deleteChat: (id: string) => api.delete(`/chat/${id}`),
+};
+
+export const messageApi = {
+  getMessages: (chatId: string) => api.get<Message[]>(`/message/${chatId}`),
+  sendMessage: (data: SendMessagePayload) =>
+    api.post<Message>("/message", data),
+  deleteMessage: (id: string) => api.delete(`/message/${id}`),
+  getChat: (chatId: string) => api.get<Chat>(`/chat/${chatId}`),
+};
+
+export const videoApi = {
+  createRoom: () => api.post("/video/room"),
+  joinRoom: (roomId: string) => api.post(`/video/room/${roomId}/join`),
+  leaveRoom: (roomId: string) => api.post(`/video/room/${roomId}/leave`),
+};
+
+export const uploadFile = async (file: File): Promise<string> => {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    console.log("Uploading file:", file);
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await api.post<{url: string}>("/upload", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${token}`,
+      },
+      timeout: 30000,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    });
+
+    console.log("Upload response:", response.data);
+
+    if (!response.data?.url) {
+      throw new Error("No URL returned from upload");
+    }
+
+    const fileUrl = response.data.url;
+    console.log("File URL:", fileUrl);
+    return fileUrl;
+  } catch (error) {
+    console.error("Upload error details:", {
+      error,
+      message: error instanceof Error ? error.message : "Unknown error",
+      response: (error as UploadError)?.response?.data,
+    });
+    throw error;
+  }
+};
+
+export default api;

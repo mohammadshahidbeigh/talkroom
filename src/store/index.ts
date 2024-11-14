@@ -1,22 +1,24 @@
 // client/src/store/index.ts
 import {configureStore} from "@reduxjs/toolkit";
 import {setupListeners} from "@reduxjs/toolkit/query";
-import {api} from "../services/api";
+import {apiSlice} from "../services/apiSlice";
 import authSlice from "./slices/authSlice";
 import chatSlice from "./slices/chatSlice";
 import userSlice from "./slices/userSlice";
 import videoSlice from "./slices/videoSlice";
+import settingsSlice from "./slices/settingsSlice";
 
 export const store = configureStore({
   reducer: {
-    [api.reducerPath]: api.reducer,
+    [apiSlice.reducerPath]: apiSlice.reducer,
     auth: authSlice,
     chat: chatSlice,
     user: userSlice,
     video: videoSlice,
+    settings: settingsSlice,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(api.middleware),
+    getDefaultMiddleware().concat(apiSlice.middleware),
 });
 
 setupListeners(store.dispatch);

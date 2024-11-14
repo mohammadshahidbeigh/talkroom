@@ -1,392 +1,310 @@
 // client/src/components/Chat/ChatRoom.tsx
-import {useSpring, animated} from "@react-spring/web";
-import {
-  Avatar,
-  Button,
-  Card,
-  CardContent,
-  TextField,
-  Box,
-  Typography,
-  IconButton,
-  Badge,
-} from "@mui/material";
-import {
-  FiPaperclip,
-  FiSend,
-  FiSmile,
-  FiMoreVertical,
-  FiPhone,
-  FiVideo,
-} from "react-icons/fi";
+import {Box, Snackbar, Alert} from "@mui/material";
 import {Sidebar} from "../Layout";
+import {useEffect, useState} from "react";
+import {useSocket} from "../../contexts/SocketContext";
+import {messageApi} from "../../services/api";
+import useAppSelector from "../../hooks/useAppSelector";
+import {Chat, Message, User} from "../../types";
+import ChatList from "./ChatList";
+import MessageArea from "./MessageArea";
+import api from "../../services/api";
+import {
+  useSendMessageMutation,
+  useDeleteMessageMutation,
+  useGetMessagesQuery,
+} from "../../services/apiSlice";
 
 const ChatRoom: React.FC = () => {
-  const fadeIn = useSpring({
-    from: {opacity: 0},
-    to: {opacity: 1},
-    config: {duration: 500},
+  const user = useAppSelector((state) => state.auth.user);
+  const socket = useSocket();
+
+  // State declarations
+  const [currentChat, setCurrentChat] = useState<Chat | null>(null);
+  const [messageList, setMessageList] = useState<Message[]>([]);
+  const [participants, setParticipants] = useState<User[]>([]);
+  const [messageInput, setMessageInput] = useState("");
+  const [notification, setNotification] = useState({
+    open: false,
+    message: "",
+    severity: "success" as "success" | "error",
   });
 
-  const chats = [
-    {
-      id: 1,
-      name: "Alice Johnson",
-      avatar: "/avatars/01.png",
-      lastMessage: "Hey, how are you?",
-      time: "2m ago",
-      unread: 2,
-      isOnline: true,
-    },
-    {
-      id: 2,
-      name: "Bob Smith",
-      avatar: "/avatars/02.png",
-      lastMessage: "Can we schedule a call?",
-      time: "1h ago",
-      unread: 0,
-      isOnline: false,
-    },
-    {
-      id: 3,
-      name: "Carol Williams",
-      avatar: "/avatars/03.png",
-      lastMessage: "The project is ready for review",
-      time: "3h ago",
-      unread: 1,
-      isOnline: true,
-    },
-  ];
+  // Use RTK Query hooks
+  const [sendMessage] = useSendMessageMutation();
+  const [deleteMessage] = useDeleteMessageMutation();
+  const {data: messages} = useGetMessagesQuery(currentChat?.id ?? "", {
+    skip: !currentChat,
+  });
 
-  const messages = [
-    {
-      id: 1,
-      sender: "Alice Johnson",
-      content: "Hi there! How's the project coming along?",
-      time: "10:30 AM",
-      isSent: false,
-      status: "read",
-    },
-    {
-      id: 2,
-      sender: "You",
-      content:
-        "Hey Alice! It's going well. I've just finished the main component.",
-      time: "10:32 AM",
-      isSent: true,
-      status: "read",
-    },
-    {
-      id: 3,
-      sender: "Alice Johnson",
-      content: "That's great news! Can you share a screenshot?",
-      time: "10:33 AM",
-      isSent: false,
-      status: "read",
-    },
-    {
-      id: 4,
-      sender: "You",
-      content: "Sure, I'll send it right away.",
-      time: "10:35 AM",
-      isSent: true,
-      status: "sent",
-    },
-  ];
+  useEffect(() => {
+    if (messages) {
+      setMessageList(messages);
+    }
+  }, [messages]);
+
+  const handleCloseNotification = () => {
+    setNotification((prev) => ({...prev, open: false}));
+  };
+
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || !currentChat || !user) return;
+
+    try {
+      const messageData = {
+        chatId: currentChat.id,
+        content: messageInput.trim(),
+        type: "text" as const,
+      };
+
+      const response = await sendMessage(messageData).unwrap();
+
+      // Add the new message to the list immediately
+      setMessageList((prev) => [...prev, response]);
+
+      // Emit socket event for real-time
+      socket?.emit("message", response);
+
+      // Clear input
+      setMessageInput("");
+    } catch (error) {
+      console.error("Error sending message:", error);
+      setNotification({
+        open: true,
+        message: "Failed to send message",
+        severity: "error",
+      });
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!currentChat || !user) return;
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadResponse = await api.post("/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (!uploadResponse.data.url) {
+        throw new Error("File upload failed");
+      }
+
+      // Send message with file URL using RTK Query
+      const response = await sendMessage({
+        chatId: currentChat.id,
+        content: uploadResponse.data.url,
+        type: "file",
+      }).unwrap();
+
+      // Update message list
+      setMessageList((prev) => [...prev, response]);
+
+      // Emit socket event for real-time
+      socket?.emit("message", response);
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      setNotification({
+        open: true,
+        message: "Failed to upload file",
+        severity: "error",
+      });
+    }
+  };
+
+  const handleChatSelect = async (chat: Chat | null) => {
+    setCurrentChat(chat);
+    if (chat) {
+      try {
+        const response = await messageApi.getMessages(chat.id);
+        setMessageList(response.data);
+        setParticipants(chat.participants.map((p) => p.user));
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+        setNotification({
+          open: true,
+          message: "Failed to fetch messages",
+          severity: "error",
+        });
+      }
+    } else {
+      setMessageList([]);
+      setParticipants([]);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      await deleteMessage(messageId).unwrap();
+      setMessageList((prev) => prev.filter((msg) => msg.id !== messageId));
+
+      // Emit socket event for real-time deletion
+      socket?.emit("message-deleted", {
+        chatId: currentChat?.id,
+        messageId,
+      });
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      setNotification({
+        open: true,
+        message: "Failed to delete message",
+        severity: "error",
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (socket) {
+      // Update message list when receiving a new message
+      socket.on("message", (message: Message) => {
+        console.log("Received message:", message);
+        if (message.chatId === currentChat?.id) {
+          console.log("Message is for current chat, updating list");
+          setMessageList((prev) => {
+            // Check if message already exists to prevent duplicates
+            if (prev.some((m) => m.id === message.id)) {
+              return prev;
+            }
+            return [...prev, message];
+          });
+
+          // Auto scroll to bottom when new message arrives
+          setTimeout(() => {
+            const messagesContainer = document.querySelector(
+              ".messages-container"
+            );
+            if (messagesContainer) {
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+          }, 100);
+        }
+      });
+
+      // Handle chat updates
+      socket.on("chat-updated", async (updatedChat: Chat) => {
+        console.log("Received chat update:", updatedChat);
+        if (currentChat?.id === updatedChat.id) {
+          // Update current chat
+          setCurrentChat(updatedChat);
+          // Refresh messages
+          const response = await messageApi.getMessages(updatedChat.id);
+          setMessageList(response.data);
+          setParticipants(updatedChat.participants.map((p) => p.user));
+        }
+      });
+
+      // Handle participant leaving
+      socket.on("participant-left", async ({chatId, username}) => {
+        console.log(`Participant ${username} left chat ${chatId}`);
+        if (chatId === currentChat?.id) {
+          // Create a system message locally
+          const systemMessage: Message = {
+            id: `system-${Date.now()}`,
+            content: `${username} left the chat`,
+            type: "system",
+            senderId: "system",
+            chatId: chatId,
+            createdAt: new Date().toISOString(),
+            sender: {
+              id: "system",
+              username: "System",
+              email: "",
+              fullName: "System",
+              status: "",
+              createdAt: "",
+              updatedAt: "",
+            },
+          };
+
+          // Add system message to message list
+          setMessageList((prev) => [...prev, systemMessage]);
+
+          // Refresh participants list
+          const chatResponse = await messageApi.getChat(chatId);
+          if (chatResponse.data) {
+            setParticipants(chatResponse.data.participants.map((p) => p.user));
+          }
+
+          // Auto scroll to bottom
+          setTimeout(() => {
+            const messagesContainer = document.querySelector(
+              ".messages-container"
+            );
+            if (messagesContainer) {
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+          }, 100);
+        }
+      });
+
+      // Join the chat room when selecting a chat
+      if (currentChat) {
+        socket.emit("join-chat", currentChat.id);
+      }
+
+      return () => {
+        // Leave the chat room when unmounting or changing chats
+        if (currentChat) {
+          socket.emit("leave-chat", currentChat.id);
+        }
+        socket.off("message");
+        socket.off("chat-updated");
+        socket.off("participant-left");
+      };
+    }
+  }, [socket, currentChat]);
 
   return (
     <Box
-      sx={{display: "flex", minHeight: "100vh", bgcolor: "background.default"}}
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        bgcolor: "background.default",
+        overflow: "hidden",
+      }}
     >
-      {/* Main Sidebar */}
       <Sidebar />
 
-      {/* Main Content */}
       <Box
         sx={{
-          flexGrow: 1,
           display: "flex",
-          flexDirection: "column",
+          flexGrow: 1,
           marginLeft: "240px",
-          width: "calc(100% - 240px)",
+          overflow: "hidden",
         }}
       >
-        {/* Chat Container */}
-        <animated.div style={fadeIn}>
-          <Box sx={{display: "flex", height: "calc(100vh - 64px)"}}>
-            {/* Chat List Sidebar */}
-            <Box
-              component="aside"
-              sx={{
-                width: 320,
-                bgcolor: "background.paper",
-                borderRight: 1,
-                borderColor: "divider",
-                height: "100%",
-                position: "fixed",
-                left: 240,
-                overflowY: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                boxShadow: 1,
-              }}
-            >
-              <Box sx={{p: 2.5, borderBottom: 1, borderColor: "divider"}}>
-                <TextField
-                  fullWidth
-                  placeholder="Search conversations..."
-                  variant="outlined"
-                  size="small"
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: 2,
-                      bgcolor: "grey.50",
-                    },
-                  }}
-                />
-              </Box>
-              <Box sx={{flexGrow: 1, overflowY: "auto"}}>
-                {chats.map((chat) => (
-                  <Box
-                    key={chat.id}
-                    sx={{
-                      p: 2,
-                      "&:hover": {bgcolor: "action.hover"},
-                      cursor: "pointer",
-                      borderBottom: 1,
-                      borderColor: "divider",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    <Box sx={{display: "flex", alignItems: "center", gap: 2}}>
-                      <Badge
-                        overlap="circular"
-                        anchorOrigin={{vertical: "bottom", horizontal: "right"}}
-                        variant="dot"
-                        color={chat.isOnline ? "success" : "default"}
-                      >
-                        <Avatar src={chat.avatar} alt={chat.name}>
-                          {chat.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </Avatar>
-                      </Badge>
-                      <Box sx={{flexGrow: 1, minWidth: 0}}>
-                        <Typography variant="subtitle1" fontWeight={500} noWrap>
-                          {chat.name}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          noWrap
-                        >
-                          {chat.lastMessage}
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "flex-end",
-                        }}
-                      >
-                        <Typography variant="caption" color="text.secondary">
-                          {chat.time}
-                        </Typography>
-                        {chat.unread > 0 && (
-                          <Badge
-                            badgeContent={chat.unread}
-                            color="primary"
-                            sx={{mt: 0.5}}
-                          />
-                        )}
-                      </Box>
-                    </Box>
-                  </Box>
-                ))}
-              </Box>
-            </Box>
+        <ChatList currentChat={currentChat} onChatSelect={handleChatSelect} />
 
-            {/* Chat Area */}
-            <Box
-              component="main"
-              sx={{
-                flexGrow: 1,
-                display: "flex",
-                flexDirection: "column",
-                marginLeft: "320px",
-                bgcolor: "grey.50",
-              }}
-            >
-              {/* Chat Header */}
-              <Box
-                component="header"
-                sx={{
-                  bgcolor: "background.paper",
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  p: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  boxShadow: 1,
-                }}
-              >
-                <Box sx={{display: "flex", alignItems: "center", gap: 2}}>
-                  <Badge
-                    overlap="circular"
-                    anchorOrigin={{vertical: "bottom", horizontal: "right"}}
-                    variant="dot"
-                    color="success"
-                  >
-                    <Avatar
-                      src="/avatars/01.png"
-                      alt="Alice Johnson"
-                      sx={{width: 48, height: 48}}
-                    >
-                      AJ
-                    </Avatar>
-                  </Badge>
-                  <Box>
-                    <Typography variant="h6" fontWeight={600}>
-                      Alice Johnson
-                    </Typography>
-                    <Typography variant="body2" color="success.main">
-                      Online
-                    </Typography>
-                  </Box>
-                </Box>
-                <Box sx={{display: "flex", gap: 1}}>
-                  <IconButton color="primary">
-                    <FiPhone />
-                  </IconButton>
-                  <IconButton color="primary">
-                    <FiVideo />
-                  </IconButton>
-                  <IconButton>
-                    <FiMoreVertical />
-                  </IconButton>
-                </Box>
-              </Box>
-
-              {/* Messages */}
-              <Box sx={{flexGrow: 1, p: 3, overflowY: "auto"}}>
-                {messages.map((message) => (
-                  <Box
-                    key={message.id}
-                    sx={{
-                      display: "flex",
-                      justifyContent: message.isSent
-                        ? "flex-end"
-                        : "flex-start",
-                      mb: 2,
-                    }}
-                  >
-                    <Card
-                      elevation={0}
-                      sx={{
-                        maxWidth: "70%",
-                        bgcolor: message.isSent
-                          ? "primary.main"
-                          : "background.paper",
-                        borderRadius: 3,
-                      }}
-                    >
-                      <CardContent sx={{pb: "12px !important"}}>
-                        <Typography
-                          variant="body1"
-                          color={
-                            message.isSent
-                              ? "primary.contrastText"
-                              : "text.primary"
-                          }
-                        >
-                          {message.content}
-                        </Typography>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                            mt: 0.5,
-                          }}
-                        >
-                          <Typography
-                            variant="caption"
-                            color={
-                              message.isSent
-                                ? "primary.contrastText"
-                                : "text.secondary"
-                            }
-                            sx={{opacity: 0.8}}
-                          >
-                            {message.time}
-                          </Typography>
-                          {message.isSent && (
-                            <Typography
-                              variant="caption"
-                              color="primary.contrastText"
-                              sx={{opacity: 0.8}}
-                            >
-                              • {message.status}
-                            </Typography>
-                          )}
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Box>
-                ))}
-              </Box>
-
-              {/* Message Input */}
-              <Box
-                sx={{
-                  bgcolor: "background.paper",
-                  borderTop: 1,
-                  borderColor: "divider",
-                  p: 2,
-                  boxShadow: "0 -2px 10px rgba(0,0,0,0.05)",
-                }}
-              >
-                <Box sx={{display: "flex", alignItems: "center", gap: 1.5}}>
-                  <IconButton color="primary" size="medium">
-                    <FiPaperclip />
-                  </IconButton>
-                  <TextField
-                    fullWidth
-                    placeholder="Type your message..."
-                    variant="outlined"
-                    size="small"
-                    multiline
-                    maxRows={4}
-                    sx={{
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: 3,
-                        bgcolor: "grey.50",
-                      },
-                    }}
-                  />
-                  <IconButton color="primary" size="medium">
-                    <FiSmile />
-                  </IconButton>
-                  <Button
-                    variant="contained"
-                    endIcon={<FiSend />}
-                    sx={{
-                      borderRadius: 2,
-                      px: 3,
-                      py: 1,
-                    }}
-                  >
-                    Send
-                  </Button>
-                </Box>
-              </Box>
-            </Box>
-          </Box>
-        </animated.div>
+        <MessageArea
+          currentChat={currentChat}
+          messages={messageList}
+          participants={participants}
+          messageInput={messageInput}
+          setMessageInput={setMessageInput}
+          onSendMessage={handleSendMessage}
+          onFileUpload={handleFileUpload}
+          onDeleteMessage={handleDeleteMessage}
+        />
       </Box>
+
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={handleCloseNotification}
+        anchorOrigin={{vertical: "top", horizontal: "center"}}
+      >
+        <Alert
+          onClose={handleCloseNotification}
+          severity={notification.severity}
+          sx={{width: "100%"}}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
