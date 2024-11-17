@@ -1,5 +1,5 @@
 // client/src/components/Video/VideoStream.tsx
-import React, {useEffect, useRef} from "react";
+import {useEffect, useRef} from "react";
 import {useSpring, animated} from "@react-spring/web";
 import {startVideoStream} from "../../services/webrtc";
 
