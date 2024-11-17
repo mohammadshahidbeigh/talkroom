@@ -18,7 +18,7 @@ import {
   peerConnections,
 } from "../../services/webrtc";
 import VideoStream from "./VideoStream";
-import {Box, IconButton, Grid, Paper, Badge, Drawer} from "@mui/material";
+import {Box, IconButton, Paper, Badge, Drawer} from "@mui/material";
 import {
   FiMic,
   FiMicOff,
@@ -62,15 +62,6 @@ const getOptimalGridSize = (count: number) => {
     cols: 4,
     rows: Math.ceil(count / 4),
   };
-};
-
-const calculateVideoSize = (totalParticipants: number, isPinned: boolean) => {
-  if (isPinned) return {width: "100%", height: "100%"};
-  if (totalParticipants <= 1) return {width: "100%", height: "100%"};
-  if (totalParticipants <= 2) return {width: "50%", height: "100%"};
-  if (totalParticipants <= 4) return {width: "50%", height: "50%"};
-  if (totalParticipants <= 6) return {width: "33.33%", height: "50%"};
-  return {width: "25%", height: "33.33%"};
 };
 
 const VideoRoom: React.FC = () => {
@@ -371,7 +362,6 @@ const VideoRoom: React.FC = () => {
   };
 
   const totalParticipants = participants.length + (localStream ? 1 : 0);
-  const gridLayout = getOptimalGridSize(totalParticipants);
 
   if (!isInRoom || !roomId) {
     return (
