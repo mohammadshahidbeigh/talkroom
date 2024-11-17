@@ -2,7 +2,7 @@
 import {Box, Snackbar, Alert} from "@mui/material";
 import {Sidebar} from "../Layout";
 import {useEffect, useState} from "react";
-import {useSocket} from "../../contexts/SocketContext";
+import useSocket from "../../hooks/useSocket"; 
 import {messageApi} from "../../services/api";
 import useAppSelector from "../../hooks/useAppSelector";
 import {Chat, Message, User} from "../../types";

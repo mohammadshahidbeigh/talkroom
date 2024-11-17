@@ -7,14 +7,50 @@ export default (io: Server) => {
 
     // Join a specific chat room
     socket.on("join-chat", (chatId: string) => {
-      socket.join(chatId);
-      console.log(`User ${socket.id} joined chat ${chatId}`);
+      if (typeof chatId === "string") {
+        socket.join(chatId);
+        console.log(`User ${socket.id} joined chat ${chatId}`);
+      } else {
+        console.error("Invalid chatId:", chatId);
+      }
+    });
+
+    // Add a join-room handler for video rooms
+    socket.on("join-room", (roomId: string) => {
+      if (typeof roomId === "string") {
+        socket.join(roomId);
+        console.log(`User ${socket.id} joined video room ${roomId}`);
+
+        // Notify others in the room
+        socket.to(roomId).emit("user-joined", {
+          userId: socket.id,
+          roomId: roomId,
+        });
+      } else {
+        console.error("Invalid roomId:", roomId);
+      }
     });
 
     // Leave a chat room
     socket.on("leave-chat", (chatId: string) => {
       socket.leave(chatId);
       console.log(`User ${socket.id} left chat ${chatId}`);
+    });
+
+    // Add a leave-room handler
+    socket.on("leave-room", (roomId: string) => {
+      if (typeof roomId === "string") {
+        socket.leave(roomId);
+        console.log(`User ${socket.id} left video room ${roomId}`);
+
+        // Notify others in the room
+        socket.to(roomId).emit("user-left", {
+          userId: socket.id,
+          roomId: roomId,
+        });
+      } else {
+        console.error("Invalid roomId:", roomId);
+      }
     });
 
     // Handle participant leaving chat

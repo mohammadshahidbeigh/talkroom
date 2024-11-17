@@ -39,6 +39,14 @@ const AppRoutes: React.FC = () => {
         }
       />
       <Route
+        path="/video/:roomId"
+        element={
+          <ProtectedRoute>
+            <VideoRoom />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/profile"
         element={
           <ProtectedRoute>

@@ -1,25 +1,49 @@
 // client/src/contexts/SocketContext.tsx
-import React, {createContext, useContext, useEffect} from "react";
-import {connectSocket, disconnectSocket} from "../services/socket";
+import React, {useEffect, useRef} from "react";
+import {io} from "socket.io-client";
+import {SocketContext} from "./SocketContextValue";
 
-export const SocketContext = createContext<ReturnType<
-  typeof connectSocket
-> | null>(null);
-
-export const useSocket = () => useContext(SocketContext);
+const SOCKET_URL = "http://localhost:5000";
 
 export const SocketProvider: React.FC<{children: React.ReactNode}> = ({
   children,
 }) => {
-  const socket = connectSocket();
+  const socketRef = useRef(
+    io(SOCKET_URL, {
+      autoConnect: false,
+      reconnection: true,
+      transports: ["websocket", "polling"],
+      path: "/socket.io/",
+      withCredentials: true,
+    })
+  );
 
   useEffect(() => {
+    const socket = socketRef.current;
+
+    if (!socket.connected) {
+      socket.connect();
+      console.log("Socket connected successfully");
+
+      socket.on("connect_error", (error) => {
+        console.error("Socket connection error:", error);
+      });
+
+      socket.on("disconnect", (reason) => {
+        console.log("Socket disconnected:", reason);
+      });
+    }
+
     return () => {
-      disconnectSocket();
+      if (socket.connected) {
+        socket.disconnect();
+      }
     };
   }, []);
 
   return (
-    <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>
+    <SocketContext.Provider value={socketRef.current}>
+      {children}
+    </SocketContext.Provider>
   );
 };

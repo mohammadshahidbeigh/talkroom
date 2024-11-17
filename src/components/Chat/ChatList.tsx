@@ -21,7 +21,7 @@ import {Chat} from "../../types";
 import {useState, useEffect} from "react";
 import CreateChatDialog from "./CreateChatDialog";
 import {useGetChatsQuery, useDeleteChatMutation} from "../../services/apiSlice";
-import {useSocket} from "../../contexts/SocketContext";
+import useSocket from "../../hooks/useSocket"; // Use default import instead of named import
 
 interface ChatListProps {
   currentChat: Chat | null;

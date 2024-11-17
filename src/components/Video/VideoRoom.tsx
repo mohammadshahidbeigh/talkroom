@@ -1,362 +1,395 @@
 // client/src/components/Video/VideoRoom.tsx
-import {useEffect, useRef, useState} from "react";
-import {startVideoStream} from "../../services/webrtc";
+import React, {useEffect, useState, useCallback, useRef} from "react";
+import useSocket from "../../hooks/useSocket";
+import useAppSelector from "../../hooks/useAppSelector";
+import type {RootState} from "../../store";
 import {
-  Avatar,
-  Button,
-  Box,
-  Typography,
-  Container,
-  Paper,
-  IconButton,
-  Menu,
-  MenuItem,
-} from "@mui/material";
+  startVideoStream,
+  handlePeerConnection,
+  createAndSendOffer,
+  handleReceivedOffer,
+  handleReceivedAnswer,
+  handleIceCandidate,
+  startScreenShare,
+  toggleAudio,
+  toggleVideo,
+  cleanupPeerConnections,
+  getPeerConnection,
+  peerConnections,
+} from "../../services/webrtc";
+import VideoStream from "./VideoStream";
+import {Box, IconButton, Grid, Paper, Badge, Drawer} from "@mui/material";
 import {
   FiMic,
+  FiMicOff,
   FiVideo,
+  FiVideoOff,
   FiPhoneOff,
+  FiMonitor,
   FiMessageSquare,
   FiUsers,
-  FiMoreVertical,
-  FiChevronRight,
-  FiX,
 } from "react-icons/fi";
-import {Sidebar} from "../Layout";
+import VideoRoomForm from "./VideoRoomForm";
+import RoomInfo from "./RoomInfo";
+import VideoChatPanel from "./VideoChatPanel";
+import ParticipantsList from "./ParticipantsList";
+import {useNavigate, useParams} from "react-router-dom";
 
-const VideoRoom = () => {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [showParticipants, setShowParticipants] = useState(false);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const open = Boolean(anchorEl);
-  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
+interface Participant {
+  userId: string;
+  username: string;
+  stream: MediaStream;
+}
+
+interface PeerConnectionWithStream {
+  connection: RTCPeerConnection;
+  stream: MediaStream;
+}
+
+const VideoRoom: React.FC = () => {
+  const socket = useSocket();
+  const navigate = useNavigate();
+  const {roomId} = useParams<{roomId: string}>();
+  const user = useAppSelector((state: RootState) => state.auth.user);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isInRoom, setIsInRoom] = useState(false);
+  const hasJoinedRoom = useRef(false);
+  const cleanupRef = useRef(() => {});
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
+  const screenShareStream = useRef<MediaStream | null>(null);
+
+  const handleCreateRoom = useCallback(() => {
+    const newRoomId = "room-" + Date.now();
+    navigate(`/video/${newRoomId}`);
+  }, [navigate]);
+
+  const handleJoinRoom = useCallback(
+    (roomId: string) => {
+      navigate(`/video/${roomId}`);
+    },
+    [navigate]
+  );
+
+  const initializeMedia = useCallback(async () => {
+    if (!roomId || !user || hasJoinedRoom.current) return;
+
+    try {
+      const stream = await startVideoStream();
+      setLocalStream(stream);
+      socket.emit("join-room", roomId);
+      hasJoinedRoom.current = true;
+      setIsInRoom(true);
+
+      // Store cleanup function
+      cleanupRef.current = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        socket.emit("leave-room", roomId);
+        hasJoinedRoom.current = false;
+        cleanupPeerConnections();
+      };
+    } catch (error) {
+      console.error("Failed to initialize media:", error);
+    }
+  }, [user, socket, roomId]);
+
+  const handleLeaveRoom = useCallback(() => {
+    cleanupRef.current();
+    navigate("/video");
+  }, [navigate]);
+
+  const handleToggleAudio = useCallback(() => {
+    if (localStream) {
+      const enabled = toggleAudio(localStream);
+      setIsAudioEnabled(enabled);
+    }
+  }, [localStream]);
+
+  const handleToggleVideo = useCallback(() => {
+    if (localStream) {
+      const enabled = toggleVideo(localStream);
+      setIsVideoEnabled(enabled);
+    }
+  }, [localStream]);
 
   useEffect(() => {
-    const initializeVideo = async () => {
-      try {
-        const stream = await startVideoStream();
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (error) {
-        console.error("Error accessing video stream:", error);
-      }
+    if (roomId && !hasJoinedRoom.current) {
+      initializeMedia();
+    }
+
+    // Cleanup function
+    return () => {
+      cleanupRef.current();
     };
-    initializeVideo();
+  }, [roomId, initializeMedia]);
+
+  // Add this function at the component level
+  const addParticipant = useCallback((userId: string, stream: MediaStream) => {
+    setParticipants((prev) => {
+      // Check if participant already exists
+      const exists = prev.some((p) => p.userId === userId);
+      if (exists) return prev;
+
+      // Add new participant
+      return [
+        ...prev,
+        {
+          userId,
+          username: `User ${userId.slice(0, 4)}`,
+          stream,
+        },
+      ];
+    });
   }, []);
 
-  const participants = [
-    {id: 1, name: "You", avatar: "/avatars/00.png", isSpeaking: true},
-    {
-      id: 2,
-      name: "Alice Johnson",
-      avatar: "/avatars/01.png",
-      isSpeaking: false,
-    },
-    {id: 3, name: "Bob Smith", avatar: "/avatars/02.png", isSpeaking: false},
-    {
-      id: 4,
-      name: "Carol Williams",
-      avatar: "/avatars/03.png",
-      isSpeaking: false,
-    },
-  ];
+  // Handle incoming WebRTC events
+  useEffect(() => {
+    if (!socket || !roomId || !localStream) return;
+
+    console.log("Setting up WebRTC event handlers");
+
+    const handleUserJoined = async ({userId}: {userId: string}) => {
+      console.log("User joined:", userId);
+
+      const peerConnection = await handlePeerConnection(
+        socket,
+        localStream,
+        userId,
+        roomId,
+        (stream, userId) => {
+          console.log("Got remote stream from user:", userId);
+          addParticipant(userId, stream);
+        }
+      );
+
+      await createAndSendOffer(socket, peerConnection, userId, roomId);
+    };
+
+    const handleOffer = async ({
+      offer,
+      remoteUserId,
+    }: {
+      offer: RTCSessionDescriptionInit;
+      remoteUserId: string;
+    }) => {
+      console.log("Received offer from:", remoteUserId);
+
+      const peerConnection = await handlePeerConnection(
+        socket,
+        localStream,
+        remoteUserId,
+        roomId,
+        (stream, userId) => {
+          console.log("Got remote stream from offer:", userId);
+          addParticipant(userId, stream);
+        }
+      );
+
+      await handleReceivedOffer(
+        socket,
+        peerConnection,
+        offer,
+        remoteUserId,
+        roomId
+      );
+    };
+
+    const handleAnswer = async ({
+      answer,
+      remoteUserId,
+    }: {
+      answer: RTCSessionDescriptionInit;
+      remoteUserId: string;
+    }) => {
+      const peerConnection = getPeerConnection(remoteUserId)?.connection;
+      if (peerConnection) {
+        await handleReceivedAnswer(peerConnection, answer);
+      }
+    };
+
+    const handleIceCandidateMsg = async ({
+      candidate,
+      remoteUserId,
+    }: {
+      candidate: RTCIceCandidateInit;
+      remoteUserId: string;
+    }) => {
+      const peerConnection = getPeerConnection(remoteUserId)?.connection;
+      if (peerConnection) {
+        await handleIceCandidate(peerConnection, candidate);
+      }
+    };
+
+    const handleUserLeft = ({userId}: {userId: string}) => {
+      setParticipants((prev) => prev.filter((p) => p.userId !== userId));
+      // Also cleanup the peer connection
+      const peer = getPeerConnection(userId);
+      if (peer) {
+        peer.connection.close();
+        peerConnections.delete(userId);
+      }
+    };
+
+    // Subscribe to events
+    socket.on("user-joined", handleUserJoined);
+    socket.on("offer", handleOffer);
+    socket.on("answer", handleAnswer);
+    socket.on("ice-candidate", handleIceCandidateMsg);
+    socket.on("user-left", handleUserLeft);
+
+    return () => {
+      socket.off("user-joined", handleUserJoined);
+      socket.off("offer", handleOffer);
+      socket.off("answer", handleAnswer);
+      socket.off("ice-candidate", handleIceCandidateMsg);
+      socket.off("user-left", handleUserLeft);
+    };
+  }, [socket, roomId, localStream, addParticipant]);
+
+  // Handle screen sharing
+  const handleScreenShare = async () => {
+    try {
+      if (isScreenSharing && screenShareStream.current) {
+        screenShareStream.current.getTracks().forEach((track) => track.stop());
+        screenShareStream.current = null;
+        setIsScreenSharing(false);
+        socket.emit("stop-screen-share", {roomId});
+      } else {
+        const stream = await startScreenShare();
+        screenShareStream.current = stream;
+        setIsScreenSharing(true);
+        socket.emit("start-screen-share", {roomId});
+
+        // Replace video track for all peer connections
+        const videoTrack = stream.getVideoTracks()[0];
+
+        // Convert Map entries to array of PeerConnection objects with proper typing
+        const connections = Array.from(
+          peerConnections.values()
+        ) as PeerConnectionWithStream[];
+
+        connections.forEach((peer: PeerConnectionWithStream) => {
+          const sender = peer.connection
+            .getSenders()
+            .find((s: RTCRtpSender) => s.track?.kind === "video");
+          if (sender) {
+            sender.replaceTrack(videoTrack);
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Screen sharing error:", error);
+    }
+  };
+
+  if (!isInRoom || !roomId) {
+    return (
+      <VideoRoomForm
+        onCreateRoom={handleCreateRoom}
+        onJoinRoom={handleJoinRoom}
+      />
+    );
+  }
+
+  const gridColumns =
+    participants.length <= 1
+      ? 1
+      : participants.length <= 4
+      ? 2
+      : participants.length <= 9
+      ? 3
+      : 4;
+
   return (
-    <Box sx={{display: "flex", height: "100vh", overflow: "hidden"}}>
-      <Sidebar />
-      <Box
-        component="main"
+    <Box sx={{height: "100vh", display: "flex", flexDirection: "column"}}>
+      <Box sx={{flex: 1, p: 2, position: "relative"}}>
+        {roomId && <RoomInfo roomId={roomId} />}
+        <Grid container spacing={2} sx={{height: "100%"}}>
+          {localStream && user && (
+            <Grid item xs={12 / gridColumns}>
+              <Paper elevation={3} sx={{height: "100%", overflow: "hidden"}}>
+                <VideoStream
+                  stream={localStream}
+                  isLocal
+                  username={user.username}
+                />
+              </Paper>
+            </Grid>
+          )}
+          {participants.map((participant) => (
+            <Grid key={participant.userId} item xs={12 / gridColumns}>
+              <Paper elevation={3} sx={{height: "100%", overflow: "hidden"}}>
+                <VideoStream
+                  stream={participant.stream}
+                  username={participant.username}
+                />
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+      </Box>
+
+      <Paper
+        elevation={3}
         sx={{
-          flexGrow: 1,
-          ml: "240px",
+          p: 2,
           display: "flex",
-          flexDirection: "column",
-          bgcolor: "grey.900",
-          position: "relative",
-          color: "white",
+          justifyContent: "center",
+          gap: 2,
+          backgroundColor: "background.paper",
         }}
       >
-        <Container maxWidth="xl" sx={{flexGrow: 1, py: 3, px: {xs: 2, sm: 3}}}>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "repeat(2, 1fr)",
-                lg: "repeat(3, 1fr)",
-              },
-              gap: 3,
-              mb: 3,
-            }}
-          >
-            {participants.map((participant) => (
-              <Paper
-                key={participant.id}
-                elevation={4}
-                sx={{
-                  bgcolor: "grey.800",
-                  borderRadius: 2,
-                  overflow: "hidden",
-                  transition: "transform 0.2s",
-                  "&:hover": {
-                    transform: "scale(1.02)",
-                  },
-                }}
-              >
-                <Box sx={{position: "relative", pt: "56.25%"}}>
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background:
-                        "linear-gradient(to bottom, #1a1a1a, #2d2d2d)",
-                    }}
-                  >
-                    <Avatar
-                      sx={{
-                        width: 120,
-                        height: 120,
-                        border: 3,
-                        borderColor: "primary.main",
-                      }}
-                      src={participant.avatar}
-                      alt={participant.name}
-                    >
-                      {participant.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </Avatar>
-                  </Box>
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      bottom: 12,
-                      left: 12,
-                      right: 12,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Paper
-                      sx={{
-                        bgcolor: "rgba(0,0,0,0.6)",
-                        px: 2,
-                        py: 0.75,
-                        borderRadius: 2,
-                        backdropFilter: "blur(4px)",
-                      }}
-                    >
-                      <Typography variant="subtitle2" sx={{color: "white"}}>
-                        {participant.name}
-                      </Typography>
-                    </Paper>
-                    {participant.isSpeaking && (
-                      <Box
-                        sx={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: "50%",
-                          bgcolor: "success.main",
-                          boxShadow: "0 0 10px #4caf50",
-                          animation: "pulse 1.5s infinite",
-                        }}
-                      />
-                    )}
-                  </Box>
-                </Box>
-              </Paper>
-            ))}
-          </Box>
-          <Paper
-            elevation={4}
-            sx={{
-              position: "fixed",
-              bottom: 24,
-              left: "50%",
-              transform: "translateX(-50%)",
-              bgcolor: "grey.800",
-              borderRadius: 8,
-              px: 4,
-              py: 2,
-              display: "flex",
-              gap: 2,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-            }}
-          >
-            {[
-              {icon: <FiMic />, color: "primary"},
-              {icon: <FiVideo />, color: "primary"},
-              {icon: <FiPhoneOff />, color: "error"},
-              {icon: <FiMessageSquare />, color: "primary"},
-              {
-                icon: <FiUsers />,
-                color: "primary",
-                onClick: () => setShowParticipants(!showParticipants),
-              },
-              {
-                icon: <FiMoreVertical />,
-                color: "primary",
-                onClick: handleClick,
-              },
-            ].map((btn, index) => (
-              <Button
-                key={index}
-                variant={btn.color === "error" ? "contained" : "outlined"}
-                color={btn.color as "primary" | "error"}
-                onClick={btn.onClick}
-                sx={{
-                  borderRadius: "50%",
-                  minWidth: 48,
-                  height: 48,
-                  p: 0,
-                  "&:hover": {
-                    transform: "scale(1.1)",
-                  },
-                  transition: "transform 0.2s",
-                  color: "white",
-                }}
-              >
-                {btn.icon}
-              </Button>
-            ))}
-          </Paper>
-          <Menu
-            anchorEl={anchorEl}
-            open={open}
-            onClose={handleClose}
-            anchorOrigin={{
-              vertical: "top",
-              horizontal: "left",
-            }}
-            transformOrigin={{
-              vertical: "bottom",
-              horizontal: "left",
-            }}
-            sx={{
-              "& .MuiMenuItem-root": {
-                fontSize: "0.775rem",
-              },
-            }}
-          >
-            <MenuItem
-              onClick={() => {
-                setShowParticipants(true);
-                handleClose();
-              }}
-            >
-              View Participants
-            </MenuItem>
-          </Menu>
-        </Container>
-        <Paper
-          elevation={4}
-          sx={{
-            width: 300,
-            bgcolor: "grey.800",
-            borderLeft: 1,
-            borderColor: "grey.700",
-            height: "100%",
-            position: "fixed",
-            right: showParticipants ? 0 : -300,
-            top: 0,
-            overflowY: "auto",
-            boxShadow: "-4px 0 20px rgba(0,0,0,0.2)",
-            color: "white",
-            transition: "right 0.3s ease-in-out",
-          }}
+        <IconButton onClick={handleToggleAudio}>
+          {isAudioEnabled ? <FiMic /> : <FiMicOff color="red" />}
+        </IconButton>
+        <IconButton onClick={handleToggleVideo}>
+          {isVideoEnabled ? <FiVideo /> : <FiVideoOff color="red" />}
+        </IconButton>
+        <IconButton color="error" onClick={handleLeaveRoom}>
+          <FiPhoneOff />
+        </IconButton>
+        <IconButton
+          onClick={handleScreenShare}
+          color={isScreenSharing ? "primary" : "default"}
         >
-          <IconButton
-            onClick={() => setShowParticipants(false)}
-            sx={{
-              position: "absolute",
-              left: -48,
-              top: "50%",
-              transform: "translateY(-50%)",
-              bgcolor: "grey.800",
-              color: "white",
-              "&:hover": {
-                bgcolor: "grey.700",
-              },
-              display: showParticipants ? "flex" : "none",
-            }}
-          >
-            <FiChevronRight />
-          </IconButton>
-          <Box sx={{p: 3, borderBottom: 1, borderColor: "grey.700", position: "relative"}}>
-            <Typography
-              variant="h6"
-              sx={{fontWeight: "medium", color: "white"}}
-            >
-              Participants ({participants.length})
-            </Typography>
-            <IconButton
-              onClick={() => setShowParticipants(false)}
-              sx={{
-                position: "absolute",
-                right: 8,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "white",
-                "&:hover": {
-                  bgcolor: "grey.700",
-                },
-              }}
-            >
-              <FiX />
-            </IconButton>
-          </Box>
-          <Box>
-            {participants.map((participant) => (
-              <Box
-                key={participant.id}
-                sx={{
-                  p: 2,
-                  transition: "background-color 0.2s",
-                  "&:hover": {bgcolor: "grey.700"},
-                }}
-              >
-                <Box sx={{display: "flex", alignItems: "center", gap: 2}}>
-                  <Avatar
-                    src={participant.avatar}
-                    alt={participant.name}
-                    sx={{border: 2, borderColor: "primary.main"}}
-                  >
-                    {participant.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </Avatar>
-                  <Box sx={{flexGrow: 1}}>
-                    <Typography
-                      variant="body2"
-                      sx={{fontWeight: "medium", color: "white"}}
-                    >
-                      {participant.name}
-                    </Typography>
-                  </Box>
-                  <Box sx={{display: "flex", gap: 1}}>
-                    <FiMic size={16} color="#4caf50" />
-                    <FiVideo size={16} color="#4caf50" />
-                  </Box>
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        </Paper>
-      </Box>
+          <FiMonitor />
+        </IconButton>
+        <IconButton onClick={() => setIsChatOpen(true)}>
+          <Badge badgeContent={0} color="primary">
+            <FiMessageSquare />
+          </Badge>
+        </IconButton>
+        <IconButton onClick={() => setIsParticipantsOpen(true)}>
+          <Badge badgeContent={participants.length} color="primary">
+            <FiUsers />
+          </Badge>
+        </IconButton>
+      </Paper>
+
+      <Drawer
+        anchor="right"
+        open={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+      >
+        <VideoChatPanel roomId={roomId!} onClose={() => setIsChatOpen(false)} />
+      </Drawer>
+
+      <Drawer
+        anchor="right"
+        open={isParticipantsOpen}
+        onClose={() => setIsParticipantsOpen(false)}
+      >
+        {/* We'll create ParticipantsList component next */}
+        <ParticipantsList
+          participants={participants}
+          localUser={user}
+          onClose={() => setIsParticipantsOpen(false)}
+        />
+      </Drawer>
     </Box>
   );
 };
