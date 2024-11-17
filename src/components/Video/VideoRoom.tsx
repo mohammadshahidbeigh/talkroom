@@ -40,6 +40,8 @@ import {
   useLeaveVideoRoomMutation,
   useGetRoomParticipantsQuery,
 } from "../../services/apiSlice";
+import joinSound from "/public/joined.mp3";
+import endSound from "/public/end.mp3";
 
 interface Participant {
   userId: string;
@@ -110,6 +112,12 @@ const VideoRoom: React.FC = () => {
     }
   }, [roomParticipants]);
 
+  const playAudio = (type: "join" | "end") => {
+    const audio = new Audio(type === "join" ? joinSound : endSound);
+    audio.volume = 0.5;
+    audio.play().catch(console.error);
+  };
+
   const handleCreateRoom = useCallback(async () => {
     try {
       const result = await createVideoRoom().unwrap();
@@ -151,6 +159,8 @@ const VideoRoom: React.FC = () => {
   const handleLeaveRoom = useCallback(async () => {
     if (roomId) {
       try {
+        playAudio("end");
+
         await leaveVideoRoom(roomId).unwrap();
         cleanupRef.current();
         navigate("/video");
@@ -225,6 +235,7 @@ const VideoRoom: React.FC = () => {
 
     const handleUserJoined = async ({userId}: {userId: string}) => {
       console.log("User joined:", userId);
+      playAudio("join");
 
       const peerConnection = await handlePeerConnection(
         socket,
@@ -296,8 +307,9 @@ const VideoRoom: React.FC = () => {
     };
 
     const handleUserLeft = ({userId}: {userId: string}) => {
+      playAudio("end");
+
       setParticipants((prev) => prev.filter((p) => p.userId !== userId));
-      // Also cleanup the peer connection
       const peer = getPeerConnection(userId);
       if (peer) {
         peer.connection.close();
