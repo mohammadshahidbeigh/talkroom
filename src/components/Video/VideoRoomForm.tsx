@@ -6,8 +6,10 @@ import {
   Paper,
   Typography,
   Divider,
+  useTheme,
+  alpha,
 } from "@mui/material";
-import {FiVideo, FiLogIn} from "react-icons/fi";
+import {FiVideo, FiLogIn, FiUsers} from "react-icons/fi";
 
 interface VideoRoomFormProps {
   onCreateRoom: () => void;
@@ -19,6 +21,7 @@ const VideoRoomForm: React.FC<VideoRoomFormProps> = ({
   onJoinRoom,
 }) => {
   const [roomId, setRoomId] = useState("");
+  const theme = useTheme();
 
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +38,10 @@ const VideoRoomForm: React.FC<VideoRoomFormProps> = ({
         justifyContent: "center",
         minHeight: "100vh",
         p: 2,
+        background: `linear-gradient(45deg, ${alpha(
+          theme.palette.primary.main,
+          0.05
+        )}, ${alpha(theme.palette.secondary.main, 0.05)})`,
       }}
     >
       <Paper
@@ -43,11 +50,29 @@ const VideoRoomForm: React.FC<VideoRoomFormProps> = ({
           p: 4,
           maxWidth: 400,
           width: "100%",
+          borderRadius: 3,
+          border: "1px solid",
+          borderColor: "divider",
+          background: alpha(theme.palette.background.paper, 0.8),
+          backdropFilter: "blur(10px)",
         }}
       >
-        <Typography variant="h5" gutterBottom align="center">
-          Video Room
-        </Typography>
+        <Box sx={{mb: 4, textAlign: "center"}}>
+          <FiUsers size={40} color={theme.palette.primary.main} />
+          <Typography
+            variant="h5"
+            sx={{
+              mt: 2,
+              fontWeight: 600,
+              background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            Video Room
+          </Typography>
+        </Box>
 
         <Button
           fullWidth
@@ -56,12 +81,26 @@ const VideoRoomForm: React.FC<VideoRoomFormProps> = ({
           size="large"
           onClick={onCreateRoom}
           startIcon={<FiVideo />}
-          sx={{mb: 3}}
+          sx={{
+            mb: 3,
+            py: 1.5,
+            borderRadius: 2,
+            textTransform: "none",
+            fontSize: "1rem",
+            boxShadow: theme.shadows[4],
+            "&:hover": {
+              boxShadow: theme.shadows[8],
+            },
+          }}
         >
           Create New Room
         </Button>
 
-        <Divider sx={{my: 3}}>OR</Divider>
+        <Divider sx={{my: 3}}>
+          <Typography variant="body2" sx={{color: "text.secondary", px: 1}}>
+            OR
+          </Typography>
+        </Divider>
 
         <form onSubmit={handleJoinRoom}>
           <TextField
@@ -72,6 +111,11 @@ const VideoRoomForm: React.FC<VideoRoomFormProps> = ({
             margin="normal"
             variant="outlined"
             placeholder="Enter room ID to join"
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+              },
+            }}
           />
           <Button
             fullWidth
@@ -81,7 +125,17 @@ const VideoRoomForm: React.FC<VideoRoomFormProps> = ({
             size="large"
             disabled={!roomId.trim()}
             startIcon={<FiLogIn />}
-            sx={{mt: 2}}
+            sx={{
+              mt: 3,
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: "none",
+              fontSize: "1rem",
+              borderWidth: 2,
+              "&:hover": {
+                borderWidth: 2,
+              },
+            }}
           >
             Join Room
           </Button>

@@ -23,7 +23,8 @@ model User {
   githubId        String?   @unique
   sentMessages    Message[]
   participants    Participant[]
-  roomParticipants VideoRoomParticipant[]
+  createdRooms    VideoRoom[]            @relation("CreatedRooms")
+  roomParticipations VideoRoomParticipant[]
   files           File[]
 
   @@unique([provider, providerId])
@@ -64,6 +65,8 @@ model VideoRoom {
   id           String    @id @default(uuid())
   createdAt    DateTime  @default(now())
   endedAt      DateTime?
+  creator      User      @relation("CreatedRooms", fields: [creatorId], references: [id])
+  creatorId    String    
   participants VideoRoomParticipant[]
 }
 
@@ -76,6 +79,9 @@ model VideoRoomParticipant {
   leftAt   DateTime?
   room     VideoRoom @relation(fields: [roomId], references: [id])
   user     User      @relation(fields: [userId], references: [id])
+
+  @@index([roomId])
+  @@index([userId])
 }
 
 model File {

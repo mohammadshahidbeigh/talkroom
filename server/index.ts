@@ -9,24 +9,32 @@ import messageRoutes from "./routes/message";
 import uploadRoutes from "./routes/upload";
 import initializeSocket from "./services/socket";
 import {initializeWebRTC} from "./services/webrtc";
-import {PrismaClient} from ".prisma/client";
-import {testRedisConnection} from "./services/redis";
+import {PrismaClient} from "@prisma/client";
 import cors from "cors";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"],
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
   },
   path: "/socket.io/",
   transports: ["websocket", "polling"],
 });
 const prisma = new PrismaClient();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
 app.use(express.json());
 
 // Register routes
@@ -35,10 +43,7 @@ app.use("/chat", chatRoutes);
 app.use("/user", userRoutes);
 app.use("/video", videoRoutes);
 app.use("/message", messageRoutes);
-
-// File upload and download routes
 app.use("/upload", uploadRoutes);
-app.get("/uploads/:id/:filename", uploadRoutes);
 
 // Error handling middleware for JSON parsing errors
 const jsonErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
@@ -55,17 +60,6 @@ app.use(jsonErrorHandler);
 initializeSocket(io);
 initializeWebRTC(io);
 
-// Test Redis connection on startup
-testRedisConnection()
-  .then((success) => {
-    if (success) {
-      console.log("Redis test successful");
-    } else {
-      console.log("Redis test failed");
-    }
-  })
-  .catch(console.error);
-
 const PORT = process.env.PORT || 5000;
 
 prisma
@@ -78,3 +72,15 @@ prisma
     console.error("Failed to connect to database:", error);
     process.exit(1);
   });
+
+// Cleanup on server shutdown
+process.on("SIGTERM", async () => {
+  console.log("SIGTERM received. Cleaning up...");
+  await prisma.$disconnect();
+  server.close(() => {
+    console.log("Server closed");
+    process.exit(0);
+  });
+});
+
+export default app;

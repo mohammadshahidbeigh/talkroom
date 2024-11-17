@@ -45,15 +45,23 @@ export const handlePeerConnection = async (
   console.log("Creating new peer connection for:", remoteUserId);
   const peerConnection = new RTCPeerConnection(configuration);
 
-  // Add local tracks to the connection
-  localStream.getTracks().forEach((track) => {
-    console.log("Adding local track:", track.kind);
-    peerConnection.addTrack(track, localStream);
-  });
-
   // Create a new MediaStream for remote tracks
   const remoteStream = new MediaStream();
   let tracksAdded = false;
+  let isNegotiating = false;
+
+  // Add local tracks to the connection in a consistent order
+  const audioTrack = localStream.getAudioTracks()[0];
+  const videoTrack = localStream.getVideoTracks()[0];
+
+  if (audioTrack) {
+    console.log("Adding local audio track");
+    peerConnection.addTrack(audioTrack, localStream);
+  }
+  if (videoTrack) {
+    console.log("Adding local video track");
+    peerConnection.addTrack(videoTrack, localStream);
+  }
 
   // Handle incoming tracks
   peerConnection.ontrack = (event) => {
@@ -71,15 +79,38 @@ export const handlePeerConnection = async (
     }
   };
 
+  // Handle signaling state change
+  peerConnection.onsignalingstatechange = () => {
+    isNegotiating = peerConnection.signalingState !== "stable";
+  };
+
   // Handle negotiation needed
   peerConnection.onnegotiationneeded = async () => {
-    console.log("Negotiation needed for:", remoteUserId);
+    if (isNegotiating) {
+      console.log("Skipping nested negotiation");
+      return;
+    }
+
     try {
-      const offer = await peerConnection.createOffer();
+      isNegotiating = true;
+      console.log("Creating offer for:", remoteUserId);
+      const offer = await peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
+
+      if (peerConnection.signalingState !== "stable") {
+        console.log("Signaling state is not stable, skipping offer");
+        return;
+      }
+
       await peerConnection.setLocalDescription(offer);
+      console.log("Sending offer");
       socket.emit("offer", {offer, remoteUserId, roomId});
     } catch (error) {
       console.error("Error during negotiation:", error);
+    } finally {
+      isNegotiating = false;
     }
   };
 
@@ -132,20 +163,24 @@ export const createAndSendOffer = async (
   roomId: string
 ) => {
   try {
-    // Check if we can create an offer
-    if (peerConnection.signalingState !== "stable") {
-      console.log("Connection not stable, waiting...");
-      return;
+    if (peerConnection.signalingState === "stable") {
+      console.log("Creating offer");
+      const offer = await peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
+
+      console.log("Setting local description");
+      await peerConnection.setLocalDescription(offer);
+
+      console.log("Sending offer");
+      socket.emit("offer", {offer, remoteUserId, roomId});
+    } else {
+      console.log(
+        "Connection not stable, current state:",
+        peerConnection.signalingState
+      );
     }
-
-    console.log("Creating offer");
-    const offer = await peerConnection.createOffer();
-
-    console.log("Setting local description");
-    await peerConnection.setLocalDescription(offer);
-
-    console.log("Sending offer");
-    socket.emit("offer", {offer, remoteUserId, roomId});
   } catch (error) {
     console.error("Error creating offer:", error);
   }
@@ -159,25 +194,32 @@ export const handleReceivedOffer = async (
   roomId: string
 ) => {
   try {
-    // Check if we can set remote description
-    if (peerConnection.signalingState !== "stable") {
-      console.log("Resetting connection state");
-      await peerConnection.setLocalDescription({type: "rollback"});
-    }
+    console.log("Current signaling state:", peerConnection.signalingState);
 
+    // Always set remote description first
     console.log("Setting remote description from offer");
     await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
 
-    console.log("Creating answer");
-    const answer = await peerConnection.createAnswer();
+    // Now we should be in 'have-remote-offer' state
+    if (peerConnection.signalingState === "have-remote-offer") {
+      console.log("Creating answer");
+      const answer = await peerConnection.createAnswer();
 
-    console.log("Setting local description");
-    await peerConnection.setLocalDescription(answer);
+      console.log("Setting local description");
+      await peerConnection.setLocalDescription(answer);
 
-    console.log("Sending answer");
-    socket.emit("answer", {answer, remoteUserId, roomId});
+      console.log("Sending answer");
+      socket.emit("answer", {answer, remoteUserId, roomId});
+    } else {
+      console.log("Unexpected signaling state:", peerConnection.signalingState);
+    }
   } catch (error) {
     console.error("Error handling offer:", error);
+    if (error instanceof Error) {
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Current signaling state:", peerConnection.signalingState);
+    }
   }
 };
 
@@ -186,24 +228,26 @@ export const handleReceivedAnswer = async (
   answer: RTCSessionDescriptionInit
 ) => {
   try {
-    // Check connection state before setting remote description
-    if (peerConnection.signalingState === "stable") {
-      console.log("Connection already stable, ignoring answer");
-      return;
-    }
+    console.log("Current signaling state:", peerConnection.signalingState);
 
     if (peerConnection.signalingState === "have-local-offer") {
       console.log("Setting remote description from answer");
-      const remoteDesc = new RTCSessionDescription(answer);
-      await peerConnection.setRemoteDescription(remoteDesc);
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription(answer)
+      );
     } else {
       console.log(
-        "Invalid signaling state for setting remote answer:",
+        "Unexpected signaling state for answer:",
         peerConnection.signalingState
       );
     }
   } catch (error) {
     console.error("Error handling answer:", error);
+    if (error instanceof Error) {
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Current signaling state:", peerConnection.signalingState);
+    }
   }
 };
 

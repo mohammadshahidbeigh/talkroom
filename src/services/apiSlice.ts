@@ -22,11 +22,36 @@ interface UpdatePasswordPayload {
   newPassword: string;
 }
 
+interface VideoRoom {
+  id: string;
+  createdAt: Date;
+  endedAt: Date | null;
+  creatorId: string;
+  participants: VideoRoomParticipant[];
+}
+
+interface VideoRoomParticipant {
+  id: string;
+  roomId: string;
+  userId: string;
+  status: string;
+  joinedAt: Date;
+  leftAt: Date | null;
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    fullName: string;
+    avatarUrl: string | null;
+  };
+}
+
 export const apiSlice = createApi({
   reducerPath: "api",
   tagTypes: ["Messages"] as const,
   baseQuery: fetchBaseQuery({
     baseUrl: BASE_URL,
+    credentials: "include",
     prepareHeaders: (headers, {getState}) => {
       const token = (getState() as RootState).auth.token;
 
@@ -128,6 +153,32 @@ export const apiSlice = createApi({
         body: data,
       }),
     }),
+
+    // Video Room endpoints
+    createVideoRoom: builder.mutation<VideoRoom, void>({
+      query: () => ({
+        url: "/video",
+        method: "POST",
+      }),
+    }),
+
+    joinVideoRoom: builder.mutation<VideoRoom, string>({
+      query: (roomId) => ({
+        url: `/video/${roomId}/join`,
+        method: "POST",
+      }),
+    }),
+
+    leaveVideoRoom: builder.mutation<void, string>({
+      query: (roomId) => ({
+        url: `/video/${roomId}/leave`,
+        method: "POST",
+      }),
+    }),
+
+    getRoomParticipants: builder.query<VideoRoomParticipant[], string>({
+      query: (roomId) => `/video/${roomId}/participants`,
+    }),
   }),
 });
 
@@ -145,4 +196,8 @@ export const {
   useDeleteMessageMutation,
   useGetAvailableUsersQuery,
   useUpdatePasswordMutation,
+  useCreateVideoRoomMutation,
+  useJoinVideoRoomMutation,
+  useLeaveVideoRoomMutation,
+  useGetRoomParticipantsQuery,
 } = apiSlice;

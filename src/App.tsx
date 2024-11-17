@@ -1,11 +1,12 @@
 // client/src/App.tsx
 import {BrowserRouter as Router} from "react-router-dom";
 import AppRoutes from "./routes";
-import {ThemeProvider, createTheme, CssBaseline} from "@mui/material";
+import {ThemeProvider, createTheme, CssBaseline, Box} from "@mui/material";
 import useAppSelector from "./hooks/useAppSelector";
 import {SocketProvider} from "./contexts/SocketContext";
 import {Provider} from "react-redux";
 import {store} from "./store";
+import Sidebar from "./components/Layout/Sidebar";
 
 const App = () => {
   const darkMode = useAppSelector((state) => state.settings.darkMode);
@@ -27,7 +28,12 @@ const App = () => {
           }}
         >
           <SocketProvider>
-            <AppRoutes />
+            <Box sx={{display: "flex"}}>
+              <Sidebar />
+              <Box sx={{flexGrow: 1}}>
+                <AppRoutes />
+              </Box>
+            </Box>
           </SocketProvider>
         </Router>
       </ThemeProvider>

@@ -1,82 +1,32 @@
-import {Router, Request, Response} from "express";
+import {Router} from "express";
 import {
   createVideoRoom,
-  getVideoRoom,
-  endVideoRoom,
-  addParticipant,
-  removeParticipant,
+  joinVideoRoom,
+  leaveVideoRoom,
+  getRoomParticipants,
 } from "../controllers/videoController";
 import {auth} from "../middleware/auth";
-import {ParamsDictionary} from "express-serve-static-core";
-import {ParsedQs} from "qs";
+import {Request, Response} from "express";
 
 const router = Router();
 
 // Wrap handlers to ensure they return void
 const wrapHandler = (
-  handler: (
-    req: Request<
-      ParamsDictionary,
-      Record<string, unknown>,
-      Record<string, unknown>,
-      ParsedQs,
-      Record<string, unknown>
-    >,
-    res: Response<Record<string, unknown>, Record<string, unknown>>
-  ) => Promise<void>
+  handler: (req: Request, res: Response) => Promise<any>
 ) => {
-  return async (
-    req: Request<
-      ParamsDictionary,
-      Record<string, unknown>,
-      Record<string, unknown>,
-      ParsedQs,
-      Record<string, unknown>
-    >,
-    res: Response<Record<string, unknown>, Record<string, unknown>>
-  ): Promise<void> => {
-    await handler(req, res);
+  return async (req: Request, res: Response): Promise<void> => {
+    try {
+      await handler(req, res);
+    } catch (error) {
+      console.error("Route handler error:", error);
+      res.status(500).json({error: "Internal server error"});
+    }
   };
 };
 
-router.post(
-  "/",
-  auth,
-  wrapHandler(async (req: Request, res: Response) => {
-    await createVideoRoom(req, res);
-  })
-); // Create video room
-
-router.get(
-  "/:id",
-  auth,
-  wrapHandler(async (req: Request, res: Response) => {
-    await getVideoRoom(req, res);
-  })
-); // Get video room details
-
-router.put(
-  "/:id/end",
-  auth,
-  wrapHandler(async (req: Request, res: Response) => {
-    await endVideoRoom(req, res);
-  })
-); // End video room
-
-router.post(
-  "/:roomId/participant",
-  auth,
-  wrapHandler(async (req: Request, res: Response) => {
-    await addParticipant(req, res);
-  })
-); // Add participant
-
-router.delete(
-  "/:roomId/participant/:userId",
-  auth,
-  wrapHandler(async (req: Request, res: Response) => {
-    await removeParticipant(req, res);
-  })
-); // Remove participant
+router.post("/", auth, wrapHandler(createVideoRoom));
+router.post("/:roomId/join", auth, wrapHandler(joinVideoRoom));
+router.post("/:roomId/leave", auth, wrapHandler(leaveVideoRoom));
+router.get("/:roomId/participants", auth, wrapHandler(getRoomParticipants));
 
 export default router;

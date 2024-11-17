@@ -1,14 +1,19 @@
 import {Request, Response} from "express";
 import prisma from "../models";
-import {Prisma} from "@prisma/client";
 
 // Create a Video Room
 export const createVideoRoom = async (req: Request, res: Response) => {
   try {
     const videoRoom = await prisma.videoRoom.create({
       data: {
+        creatorId: req.user!.id,
         participants: {
-          create: [{userId: req.user!.id}],
+          create: [
+            {
+              userId: req.user!.id,
+              status: "joined",
+            },
+          ],
         },
       },
       include: {
@@ -19,6 +24,8 @@ export const createVideoRoom = async (req: Request, res: Response) => {
                 id: true,
                 username: true,
                 email: true,
+                fullName: true,
+                avatarUrl: true,
               },
             },
           },
@@ -32,12 +39,17 @@ export const createVideoRoom = async (req: Request, res: Response) => {
   }
 };
 
-// Get Video Room by ID
-export const getVideoRoom = async (req: Request, res: Response) => {
+// Join Video Room
+export const joinVideoRoom = async (req: Request, res: Response) => {
   try {
-    const {id} = req.params;
-    const videoRoom = await prisma.videoRoom.findUnique({
-      where: {id},
+    const {roomId} = req.params;
+
+    // Check if room exists and is not ended
+    const room = await prisma.videoRoom.findFirst({
+      where: {
+        id: roomId,
+        endedAt: null,
+      },
       include: {
         participants: {
           include: {
@@ -46,6 +58,8 @@ export const getVideoRoom = async (req: Request, res: Response) => {
                 id: true,
                 username: true,
                 email: true,
+                fullName: true,
+                avatarUrl: true,
               },
             },
           },
@@ -53,86 +67,110 @@ export const getVideoRoom = async (req: Request, res: Response) => {
       },
     });
 
-    if (!videoRoom) {
-      return res.status(404).json({error: "Video room not found"});
-    }
-
-    res.json(videoRoom);
-  } catch (error) {
-    console.error("Get video room error:", error);
-    res.status(500).json({error: "Failed to fetch video room"});
-  }
-};
-
-// End a Video Room
-export const endVideoRoom = async (req: Request, res: Response) => {
-  try {
-    const {id} = req.params;
-
-    // Check if user is in the room
-    const isParticipant = await prisma.videoRoomParticipant.findFirst({
-      where: {
-        roomId: id,
-        userId: req.user!.id,
-      },
-    });
-
-    if (!isParticipant) {
-      return res.status(403).json({error: "Not authorized to end this room"});
-    }
-
-    const endedVideoRoom = await prisma.videoRoom.update({
-      where: {id},
-      data: {endedAt: new Date()},
-    });
-    res.json(endedVideoRoom);
-  } catch (error) {
-    console.error("End video room error:", error);
-    res.status(500).json({error: "Failed to end video room"});
-  }
-};
-
-// Add Participant to Video Room
-export const addParticipant = async (req: Request, res: Response) => {
-  try {
-    const {roomId} = req.params;
-    const {userId} = req.body;
-
-    // Check if room exists
-    const room = await prisma.videoRoom.findUnique({
-      where: {id: roomId},
-    });
-
     if (!room) {
-      return res.status(404).json({error: "Video room not found"});
+      return res.status(404).json({error: "Room not found or has ended"});
     }
 
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: {id: userId},
-    });
-
-    if (!user) {
-      return res.status(404).json({error: "User not found"});
-    }
-
-    // Check if participant already exists
-    const existingParticipant = await prisma.videoRoomParticipant.findFirst({
-      where: {
-        roomId,
-        userId,
-      },
-    });
+    // Check if user is already in room
+    const existingParticipant = room.participants.find(
+      (p: {userId: string; leftAt: Date | null}) =>
+        p.userId === req.user!.id && !p.leftAt
+    );
 
     if (existingParticipant) {
-      return res.status(400).json({error: "User is already in this room"});
+      return res.json(room);
     }
 
-    const participant = await prisma.videoRoomParticipant.create({
+    // Add user to room
+    const updatedRoom = await prisma.videoRoom.update({
+      where: {id: roomId},
       data: {
+        participants: {
+          create: [
+            {
+              user: {
+                connect: {
+                  id: req.user!.id,
+                },
+              },
+              status: "joined",
+            },
+          ],
+        },
+      },
+      include: {
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                email: true,
+                fullName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    res.json(updatedRoom);
+  } catch (error) {
+    console.error("Join video room error:", error);
+    res.status(500).json({error: "Failed to join video room"});
+  }
+};
+
+// Leave Video Room
+export const leaveVideoRoom = async (req: Request, res: Response) => {
+  try {
+    const {roomId} = req.params;
+
+    // Update participant status and set leftAt
+    await prisma.videoRoomParticipant.updateMany({
+      where: {
         roomId,
-        userId,
-        status: "joined",
+        userId: req.user!.id,
+        leftAt: null,
+      },
+      data: {
+        status: "left",
+        leftAt: new Date(),
+      },
+    });
+
+    // If no active participants left, end the room
+    const remainingParticipants = await prisma.videoRoomParticipant.count({
+      where: {
+        roomId,
+        leftAt: null,
+      },
+    });
+
+    if (remainingParticipants === 0) {
+      await prisma.videoRoom.update({
+        where: {id: roomId},
+        data: {endedAt: new Date()},
+      });
+    }
+
+    res.status(200).json({message: "Left room successfully"});
+  } catch (error) {
+    console.error("Leave video room error:", error);
+    res.status(500).json({error: "Failed to leave video room"});
+  }
+};
+
+// Get Room Participants
+export const getRoomParticipants = async (req: Request, res: Response) => {
+  try {
+    const {roomId} = req.params;
+
+    const participants = await prisma.videoRoomParticipant.findMany({
+      where: {
+        roomId,
+        leftAt: null,
       },
       include: {
         user: {
@@ -140,48 +178,19 @@ export const addParticipant = async (req: Request, res: Response) => {
             id: true,
             username: true,
             email: true,
+            fullName: true,
+            avatarUrl: true,
           },
         },
       },
-    });
-    res.json(participant);
-  } catch (error) {
-    console.error("Add participant error:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2003") {
-        return res.status(400).json({error: "Invalid user or room reference"});
-      }
-    }
-    res.status(500).json({error: "Failed to add participant to room"});
-  }
-};
-
-// Remove Participant from Video Room
-export const removeParticipant = async (req: Request, res: Response) => {
-  try {
-    const {roomId, userId} = req.params;
-
-    // Check if participant exists
-    const participant = await prisma.videoRoomParticipant.findFirst({
-      where: {
-        roomId,
-        userId,
+      orderBy: {
+        joinedAt: "asc",
       },
     });
 
-    if (!participant) {
-      return res.status(404).json({error: "Participant not found in room"});
-    }
-
-    await prisma.videoRoomParticipant.deleteMany({
-      where: {
-        roomId,
-        userId,
-      },
-    });
-    res.status(204).send();
+    res.json(participants);
   } catch (error) {
-    console.error("Remove participant error:", error);
-    res.status(500).json({error: "Failed to remove participant from room"});
+    console.error("Get participants error:", error);
+    res.status(500).json({error: "Failed to get participants"});
   }
 };

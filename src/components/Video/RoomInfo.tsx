@@ -6,8 +6,10 @@ import {
   Tooltip,
   Snackbar,
   Paper,
+  useTheme,
+  alpha,
 } from "@mui/material";
-import {FiCopy, FiShare2} from "react-icons/fi";
+import {FiCopy, FiShare2, FiInfo} from "react-icons/fi";
 
 interface RoomInfoProps {
   roomId: string;
@@ -15,6 +17,7 @@ interface RoomInfoProps {
 
 const RoomInfo: React.FC<RoomInfoProps> = ({roomId}) => {
   const [showCopied, setShowCopied] = useState(false);
+  const theme = useTheme();
 
   const handleCopyRoomId = async () => {
     try {
@@ -47,40 +50,76 @@ const RoomInfo: React.FC<RoomInfoProps> = ({roomId}) => {
     <Paper
       elevation={3}
       sx={{
-        position: "absolute",
-        top: 16,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 1000,
-        p: 2,
         display: "flex",
         alignItems: "center",
         gap: 2,
-        backgroundColor: "rgba(0, 0, 0, 0.7)",
-        backdropFilter: "blur(4px)",
+        p: 1.5,
+        borderRadius: 3,
+        bgcolor: alpha(theme.palette.background.paper, 0.8),
+        backdropFilter: "blur(10px)",
+        border: "1px solid",
+        borderColor: "divider",
+        boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.1)}`,
       }}
     >
-      <Typography variant="body2" color="white">
-        Room ID: {roomId}
-      </Typography>
-      <Box sx={{display: "flex", gap: 1}}>
-        <Tooltip title="Copy Room ID">
-          <IconButton size="small" onClick={handleCopyRoomId} color="inherit">
-            <FiCopy />
+      <Box sx={{display: "flex", alignItems: "center", gap: 1}}>
+        <FiInfo size={20} color={theme.palette.primary.main} />
+        <Typography
+          variant="body2"
+          sx={{
+            fontWeight: 500,
+            color: "text.primary",
+          }}
+        >
+          Room ID: {roomId}
+        </Typography>
+      </Box>
+
+      <Box sx={{display: "flex", gap: 0.5}}>
+        <Tooltip title="Copy Room ID" arrow>
+          <IconButton
+            size="small"
+            onClick={handleCopyRoomId}
+            sx={{
+              color: "primary.main",
+              "&:hover": {
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+              },
+            }}
+          >
+            <FiCopy size={18} />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Share Room">
-          <IconButton size="small" onClick={handleShare} color="inherit">
-            <FiShare2 />
+        <Tooltip title="Share Room" arrow>
+          <IconButton
+            size="small"
+            onClick={handleShare}
+            sx={{
+              color: "primary.main",
+              "&:hover": {
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+              },
+            }}
+          >
+            <FiShare2 size={18} />
           </IconButton>
         </Tooltip>
       </Box>
+
       <Snackbar
         open={showCopied}
         autoHideDuration={2000}
         onClose={() => setShowCopied(false)}
         message="Room ID copied to clipboard"
         anchorOrigin={{vertical: "top", horizontal: "center"}}
+        sx={{
+          "& .MuiSnackbarContent-root": {
+            bgcolor: theme.palette.primary.main,
+            color: "white",
+            borderRadius: 2,
+            boxShadow: theme.shadows[4],
+          },
+        }}
       />
     </Paper>
   );

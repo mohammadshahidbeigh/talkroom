@@ -34,6 +34,12 @@ import RoomInfo from "./RoomInfo";
 import VideoChatPanel from "./VideoChatPanel";
 import ParticipantsList from "./ParticipantsList";
 import {useNavigate, useParams} from "react-router-dom";
+import {
+  useCreateVideoRoomMutation,
+  useJoinVideoRoomMutation,
+  useLeaveVideoRoomMutation,
+  useGetRoomParticipantsQuery,
+} from "../../services/apiSlice";
 
 interface Participant {
   userId: string;
@@ -45,6 +51,27 @@ interface PeerConnectionWithStream {
   connection: RTCPeerConnection;
   stream: MediaStream;
 }
+
+const getOptimalGridSize = (count: number) => {
+  if (count <= 1) return {cols: 1, rows: 1};
+  if (count <= 2) return {cols: 2, rows: 1};
+  if (count <= 4) return {cols: 2, rows: 2};
+  if (count <= 6) return {cols: 3, rows: 2};
+  if (count <= 9) return {cols: 3, rows: 3};
+  return {
+    cols: 4,
+    rows: Math.ceil(count / 4),
+  };
+};
+
+const calculateVideoSize = (totalParticipants: number, isPinned: boolean) => {
+  if (isPinned) return {width: "100%", height: "100%"};
+  if (totalParticipants <= 1) return {width: "100%", height: "100%"};
+  if (totalParticipants <= 2) return {width: "50%", height: "100%"};
+  if (totalParticipants <= 4) return {width: "50%", height: "50%"};
+  if (totalParticipants <= 6) return {width: "33.33%", height: "50%"};
+  return {width: "25%", height: "33.33%"};
+};
 
 const VideoRoom: React.FC = () => {
   const socket = useSocket();
@@ -62,11 +89,44 @@ const VideoRoom: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
   const screenShareStream = useRef<MediaStream | null>(null);
+  const [createVideoRoom] = useCreateVideoRoomMutation();
+  const [joinVideoRoom] = useJoinVideoRoomMutation();
+  const [leaveVideoRoom] = useLeaveVideoRoomMutation();
+  const {data: roomParticipants} = useGetRoomParticipantsQuery(roomId ?? "", {
+    skip: !roomId,
+    pollingInterval: 5000,
+  });
+  const [pinnedParticipantId, setPinnedParticipantId] = useState<string | null>(
+    null
+  );
 
-  const handleCreateRoom = useCallback(() => {
-    const newRoomId = "room-" + Date.now();
-    navigate(`/video/${newRoomId}`);
-  }, [navigate]);
+  useEffect(() => {
+    if (roomParticipants) {
+      setParticipants((prev) =>
+        prev.map((participant) => {
+          const apiParticipant = roomParticipants.find(
+            (p) => p.userId === participant.userId
+          );
+          if (apiParticipant) {
+            return {
+              ...participant,
+              username: apiParticipant.user.username,
+            };
+          }
+          return participant;
+        })
+      );
+    }
+  }, [roomParticipants]);
+
+  const handleCreateRoom = useCallback(async () => {
+    try {
+      const result = await createVideoRoom().unwrap();
+      navigate(`/video/${result.id}`);
+    } catch (error: unknown) {
+      console.error("Failed to create room:", error);
+    }
+  }, [createVideoRoom, navigate]);
 
   const handleJoinRoom = useCallback(
     (roomId: string) => {
@@ -97,10 +157,17 @@ const VideoRoom: React.FC = () => {
     }
   }, [user, socket, roomId]);
 
-  const handleLeaveRoom = useCallback(() => {
-    cleanupRef.current();
-    navigate("/video");
-  }, [navigate]);
+  const handleLeaveRoom = useCallback(async () => {
+    if (roomId) {
+      try {
+        await leaveVideoRoom(roomId).unwrap();
+        cleanupRef.current();
+        navigate("/video");
+      } catch (error) {
+        console.error("Failed to leave room:", error);
+      }
+    }
+  }, [roomId, leaveVideoRoom, navigate]);
 
   const handleToggleAudio = useCallback(() => {
     if (localStream) {
@@ -118,33 +185,46 @@ const VideoRoom: React.FC = () => {
 
   useEffect(() => {
     if (roomId && !hasJoinedRoom.current) {
-      initializeMedia();
+      joinVideoRoom(roomId)
+        .unwrap()
+        .then(() => {
+          initializeMedia();
+        })
+        .catch((error: unknown) => {
+          console.error("Failed to join room:", error);
+          navigate("/video");
+        });
     }
-
-    // Cleanup function
-    return () => {
-      cleanupRef.current();
-    };
-  }, [roomId, initializeMedia]);
+  }, [roomId, joinVideoRoom, initializeMedia, navigate]);
 
   // Add this function at the component level
-  const addParticipant = useCallback((userId: string, stream: MediaStream) => {
-    setParticipants((prev) => {
-      // Check if participant already exists
-      const exists = prev.some((p) => p.userId === userId);
-      if (exists) return prev;
+  const addParticipant = useCallback(
+    (userId: string, stream: MediaStream) => {
+      setParticipants((prev) => {
+        // Check if participant already exists
+        const exists = prev.some((p) => p.userId === userId);
+        if (exists) return prev;
 
-      // Add new participant
-      return [
-        ...prev,
-        {
-          userId,
-          username: `User ${userId.slice(0, 4)}`,
-          stream,
-        },
-      ];
-    });
-  }, []);
+        // Try to get username from roomParticipants
+        const apiParticipant = roomParticipants?.find(
+          (p) => p.userId === userId
+        );
+        const username =
+          apiParticipant?.user.username || `User ${userId.slice(0, 4)}`;
+
+        // Add new participant
+        return [
+          ...prev,
+          {
+            userId,
+            username,
+            stream,
+          },
+        ];
+      });
+    },
+    [roomParticipants]
+  );
 
   // Handle incoming WebRTC events
   useEffect(() => {
@@ -286,108 +366,382 @@ const VideoRoom: React.FC = () => {
     }
   };
 
+  const handlePinStream = (participantId: string | null) => {
+    setPinnedParticipantId(participantId);
+  };
+
+  const totalParticipants = participants.length + (localStream ? 1 : 0);
+  const gridLayout = getOptimalGridSize(totalParticipants);
+
   if (!isInRoom || !roomId) {
     return (
-      <VideoRoomForm
-        onCreateRoom={handleCreateRoom}
-        onJoinRoom={handleJoinRoom}
-      />
+      <Box
+        sx={{
+          marginLeft: "240px", // Account for sidebar
+          minHeight: "100vh",
+          bgcolor: "background.default",
+        }}
+      >
+        <VideoRoomForm
+          onCreateRoom={handleCreateRoom}
+          onJoinRoom={handleJoinRoom}
+        />
+      </Box>
     );
   }
 
-  const gridColumns =
-    participants.length <= 1
-      ? 1
-      : participants.length <= 4
-      ? 2
-      : participants.length <= 9
-      ? 3
-      : 4;
-
   return (
-    <Box sx={{height: "100vh", display: "flex", flexDirection: "column"}}>
-      <Box sx={{flex: 1, p: 2, position: "relative"}}>
-        {roomId && <RoomInfo roomId={roomId} />}
-        <Grid container spacing={2} sx={{height: "100%"}}>
-          {localStream && user && (
-            <Grid item xs={12 / gridColumns}>
-              <Paper elevation={3} sx={{height: "100%", overflow: "hidden"}}>
-                <VideoStream
-                  stream={localStream}
-                  isLocal
-                  username={user.username}
-                />
-              </Paper>
-            </Grid>
-          )}
-          {participants.map((participant) => (
-            <Grid key={participant.userId} item xs={12 / gridColumns}>
-              <Paper elevation={3} sx={{height: "100%", overflow: "hidden"}}>
-                <VideoStream
-                  stream={participant.stream}
-                  username={participant.username}
-                />
-              </Paper>
-            </Grid>
-          ))}
-        </Grid>
+    <Box
+      sx={{
+        marginLeft: "240px", // Account for sidebar
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        bgcolor: "background.default",
+        position: "relative",
+      }}
+    >
+      {/* Room Info */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 2,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 2,
+        }}
+      >
+        <RoomInfo roomId={roomId} />
       </Box>
 
-      <Paper
-        elevation={3}
+      {/* Video Grid */}
+      <Box
         sx={{
+          flex: 1,
+          p: 3,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          bgcolor: "background.default",
+        }}
+      >
+        <Box
+          sx={{
+            width: "100%",
+            height: "100%",
+            maxWidth: pinnedParticipantId ? "100%" : "1800px",
+            margin: "0 auto",
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 2,
+            position: "relative",
+          }}
+        >
+          {pinnedParticipantId ? (
+            // Pinned Layout
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "3fr 1fr",
+                gridTemplateRows: "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: 2,
+                width: "100%",
+                height: "100%",
+              }}
+            >
+              {/* Pinned Stream */}
+              <Box
+                sx={{
+                  gridColumn: "1 / 2",
+                  gridRow: "1 / -1",
+                  height: "100%",
+                  aspectRatio: "16/9",
+                  overflow: "hidden",
+                }}
+              >
+                {pinnedParticipantId === "local" && localStream && user ? (
+                  <VideoStream
+                    stream={localStream}
+                    isLocal
+                    username={user.username}
+                    isPinned
+                    onPinStream={() => handlePinStream(null)}
+                  />
+                ) : (
+                  participants
+                    .filter((p) => p.userId === pinnedParticipantId)
+                    .map((participant) => (
+                      <VideoStream
+                        key={participant.userId}
+                        stream={participant.stream}
+                        username={participant.username}
+                        isPinned
+                        onPinStream={() => handlePinStream(null)}
+                      />
+                    ))
+                )}
+              </Box>
+
+              {/* Other Streams */}
+              <Box
+                sx={{
+                  gridColumn: "2 / 3",
+                  gridRow: "1 / -1",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                  overflowY: "auto",
+                  height: "100%",
+                  "&::-webkit-scrollbar": {
+                    width: "8px",
+                  },
+                  "&::-webkit-scrollbar-track": {
+                    background: "transparent",
+                  },
+                  "&::-webkit-scrollbar-thumb": {
+                    background: "rgba(0,0,0,0.2)",
+                    borderRadius: "4px",
+                  },
+                }}
+              >
+                {/* Local Stream if not pinned */}
+                {localStream && user && pinnedParticipantId !== "local" && (
+                  <Box sx={{minHeight: "200px", flex: "0 0 auto"}}>
+                    <VideoStream
+                      stream={localStream}
+                      isLocal
+                      username={user.username}
+                      onPinStream={() => handlePinStream("local")}
+                    />
+                  </Box>
+                )}
+
+                {/* Other participants if not pinned */}
+                {participants
+                  .filter((p) => p.userId !== pinnedParticipantId)
+                  .map((participant) => (
+                    <Box
+                      key={participant.userId}
+                      sx={{minHeight: "200px", flex: "0 0 auto"}}
+                    >
+                      <VideoStream
+                        stream={participant.stream}
+                        username={participant.username}
+                        onPinStream={() => handlePinStream(participant.userId)}
+                      />
+                    </Box>
+                  ))}
+              </Box>
+            </Box>
+          ) : (
+            // Grid Layout
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${
+                  getOptimalGridSize(totalParticipants).cols
+                }, 1fr)`,
+                gridAutoRows: "1fr",
+                gap: 2,
+                width: "100%",
+                height: "100%",
+                aspectRatio: totalParticipants <= 1 ? "16/9" : "auto",
+              }}
+            >
+              {/* Local Stream */}
+              {localStream && user && (
+                <Box
+                  sx={{
+                    width: "100%",
+                    height: "100%",
+                    minHeight: "300px",
+                  }}
+                >
+                  <Paper
+                    elevation={3}
+                    sx={{
+                      height: "100%",
+                      position: "relative",
+                      overflow: "hidden",
+                      borderRadius: 2,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      bgcolor: "background.paper",
+                      transition: "all 0.3s ease",
+                    }}
+                  >
+                    <VideoStream
+                      stream={localStream}
+                      isLocal
+                      username={user.username}
+                      onPinStream={() => handlePinStream("local")}
+                    />
+                  </Paper>
+                </Box>
+              )}
+
+              {/* Remote Streams */}
+              {participants.map((participant) => (
+                <Box
+                  key={participant.userId}
+                  sx={{
+                    width: "100%",
+                    height: "100%",
+                    minHeight: "300px",
+                  }}
+                >
+                  <Paper
+                    elevation={3}
+                    sx={{
+                      height: "100%",
+                      position: "relative",
+                      overflow: "hidden",
+                      borderRadius: 2,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      bgcolor: "background.paper",
+                      transition: "all 0.3s ease",
+                    }}
+                  >
+                    <VideoStream
+                      stream={participant.stream}
+                      username={participant.username}
+                      onPinStream={() => handlePinStream(participant.userId)}
+                    />
+                  </Paper>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </Box>
+      </Box>
+
+      {/* Controls */}
+      <Box
+        sx={{
+          position: "fixed",
+          bottom: 0,
+          left: "240px", // Account for sidebar
+          right: 0,
           p: 2,
           display: "flex",
           justifyContent: "center",
-          gap: 2,
-          backgroundColor: "background.paper",
+          alignItems: "center",
+          zIndex: 2,
         }}
       >
-        <IconButton onClick={handleToggleAudio}>
-          {isAudioEnabled ? <FiMic /> : <FiMicOff color="red" />}
-        </IconButton>
-        <IconButton onClick={handleToggleVideo}>
-          {isVideoEnabled ? <FiVideo /> : <FiVideoOff color="red" />}
-        </IconButton>
-        <IconButton color="error" onClick={handleLeaveRoom}>
-          <FiPhoneOff />
-        </IconButton>
-        <IconButton
-          onClick={handleScreenShare}
-          color={isScreenSharing ? "primary" : "default"}
+        <Paper
+          elevation={3}
+          sx={{
+            px: 3,
+            py: 1.5,
+            display: "flex",
+            gap: 2,
+            borderRadius: 5,
+            bgcolor: "background.paper",
+            border: "1px solid",
+            borderColor: "divider",
+          }}
         >
-          <FiMonitor />
-        </IconButton>
-        <IconButton onClick={() => setIsChatOpen(true)}>
-          <Badge badgeContent={0} color="primary">
-            <FiMessageSquare />
-          </Badge>
-        </IconButton>
-        <IconButton onClick={() => setIsParticipantsOpen(true)}>
-          <Badge badgeContent={participants.length} color="primary">
-            <FiUsers />
-          </Badge>
-        </IconButton>
-      </Paper>
+          <IconButton
+            onClick={handleToggleAudio}
+            sx={{
+              p: 1.5,
+              bgcolor: isAudioEnabled ? "transparent" : "error.main",
+              color: isAudioEnabled ? "inherit" : "white",
+              "&:hover": {
+                bgcolor: isAudioEnabled ? "action.hover" : "error.dark",
+              },
+            }}
+          >
+            {isAudioEnabled ? <FiMic /> : <FiMicOff />}
+          </IconButton>
+          <IconButton
+            onClick={handleToggleVideo}
+            sx={{
+              p: 1.5,
+              bgcolor: isVideoEnabled ? "transparent" : "error.main",
+              color: isVideoEnabled ? "inherit" : "white",
+              "&:hover": {
+                bgcolor: isVideoEnabled ? "action.hover" : "error.dark",
+              },
+            }}
+          >
+            {isVideoEnabled ? <FiVideo /> : <FiVideoOff />}
+          </IconButton>
+          <IconButton
+            onClick={handleScreenShare}
+            sx={{
+              p: 1.5,
+              bgcolor: isScreenSharing ? "primary.main" : "transparent",
+              color: isScreenSharing ? "white" : "inherit",
+              "&:hover": {
+                bgcolor: isScreenSharing ? "primary.dark" : "action.hover",
+              },
+            }}
+          >
+            <FiMonitor />
+          </IconButton>
+          <IconButton onClick={() => setIsChatOpen(true)} sx={{p: 1.5}}>
+            <Badge badgeContent={0} color="primary">
+              <FiMessageSquare />
+            </Badge>
+          </IconButton>
+          <IconButton onClick={() => setIsParticipantsOpen(true)} sx={{p: 1.5}}>
+            <Badge badgeContent={participants.length} color="primary">
+              <FiUsers />
+            </Badge>
+          </IconButton>
+          <IconButton
+            onClick={handleLeaveRoom}
+            sx={{
+              p: 1.5,
+              bgcolor: "error.main",
+              color: "white",
+              "&:hover": {
+                bgcolor: "error.dark",
+              },
+            }}
+          >
+            <FiPhoneOff />
+          </IconButton>
+        </Paper>
+      </Box>
 
+      {/* Drawers */}
       <Drawer
         anchor="right"
         open={isChatOpen}
         onClose={() => setIsChatOpen(false)}
+        PaperProps={{
+          sx: {
+            width: 320,
+            marginLeft: "240px", // Account for sidebar
+          },
+        }}
       >
-        <VideoChatPanel roomId={roomId!} onClose={() => setIsChatOpen(false)} />
+        <VideoChatPanel roomId={roomId} onClose={() => setIsChatOpen(false)} />
       </Drawer>
 
       <Drawer
         anchor="right"
         open={isParticipantsOpen}
         onClose={() => setIsParticipantsOpen(false)}
+        PaperProps={{
+          sx: {
+            width: 320,
+            marginLeft: "240px", // Account for sidebar
+          },
+        }}
       >
-        {/* We'll create ParticipantsList component next */}
         <ParticipantsList
           participants={participants}
           localUser={user}
           onClose={() => setIsParticipantsOpen(false)}
+          roomId={roomId}
         />
       </Drawer>
     </Box>
