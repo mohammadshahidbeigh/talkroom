@@ -86,7 +86,7 @@ export const createChat = async (req: Request, res: Response) => {
       if (existingChat) {
         // Check if the current user is still a participant
         const isParticipant = existingChat.participants.some(
-          (p) => p.userId === req.user!.id
+          (p: { userId: string; }) => p.userId === req.user!.id
         );
 
         if (!isParticipant) {
@@ -276,7 +276,7 @@ export const deleteChat = async (req: Request, res: Response) => {
 
     // If this was the last participant, then delete the entire chat
     if (chat.participants.length === 1) {
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: { message: { deleteMany: (arg0: { where: { chatId: string; }; }) => any; }; chat: { delete: (arg0: { where: { id: string; }; }) => any; }; }) => {
         // Delete all messages first
         await tx.message.deleteMany({
           where: {chatId: id},
