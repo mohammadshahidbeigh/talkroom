@@ -19,6 +19,7 @@ import {
   FiMoreVertical,
   FiTrash2,
   FiCopy,
+  FiLock,
 } from "react-icons/fi";
 import {Chat, Message} from "../../types";
 import {useRef, useEffect, useState} from "react";
@@ -413,7 +414,27 @@ const MessageArea: React.FC<MessageAreaProps> = ({
           bgcolor: "background.paper",
         }}
       >
-        <Typography variant="h6">{currentChat.name || "Chat"}</Typography>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Typography variant="h6">{currentChat.name || "Chat"}</Typography>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+              color: "success.main",
+              fontSize: "0.75rem",
+            }}
+          >
+            <FiLock size={12} />
+            <Typography variant="caption">End-to-end encrypted</Typography>
+          </Box>
+        </Box>
         <Typography variant="body2" color="text.secondary">
           {participants.map((p) => p.username).join(", ")}
         </Typography>
