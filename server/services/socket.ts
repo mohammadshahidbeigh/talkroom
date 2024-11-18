@@ -58,51 +58,60 @@ export default (io: Server) => {
       try {
         console.log(`User ${username} is leaving chat ${chatId}`);
 
-        // Create system message about user leaving
-        const systemMessage = await prisma.message.create({
-          data: {
-            chatId,
-            content: `${username} left the chat`,
-            type: "system",
-            senderId: userId,
-          },
-          include: {
-            sender: true,
-          },
-        });
-
-        console.log("Created system message:", systemMessage);
-
-        // Broadcast the system message to the chat room
-        io.to(chatId).emit("message", systemMessage);
-        console.log("Emitted system message to room:", chatId);
-
-        // Get updated chat after participant left
-        const updatedChat = await prisma.chat.findUnique({
+        // Check if chat still exists before creating system message
+        const chatExists = await prisma.chat.findUnique({
           where: {id: chatId},
-          include: {
-            participants: {
-              include: {
-                user: true,
-              },
-            },
-            messages: {
-              include: {
-                sender: true,
-              },
-              orderBy: {
-                createdAt: "desc",
-              },
-              take: 1,
-            },
-          },
         });
 
-        // Broadcast updates to all clients
-        if (updatedChat) {
-          io.emit("chat-updated", updatedChat);
-          console.log("Emitted chat update");
+        if (chatExists) {
+          // Create system message about user leaving
+          const systemMessage = await prisma.message.create({
+            data: {
+              chatId,
+              content: `${username} left the chat`,
+              type: "system",
+              senderId: userId,
+            },
+            include: {
+              sender: true,
+            },
+          });
+
+          console.log("Created system message:", systemMessage);
+
+          // Broadcast the system message to the chat room
+          io.to(chatId).emit("message", systemMessage);
+          console.log("Emitted system message to room:", chatId);
+
+          // Get updated chat after participant left
+          const updatedChat = await prisma.chat.findUnique({
+            where: {id: chatId},
+            include: {
+              participants: {
+                include: {
+                  user: true,
+                },
+              },
+              messages: {
+                include: {
+                  sender: true,
+                },
+                orderBy: {
+                  createdAt: "desc",
+                },
+                take: 1,
+              },
+            },
+          });
+
+          // Broadcast updates to all clients
+          if (updatedChat) {
+            io.emit("chat-updated", updatedChat);
+            console.log("Emitted chat update");
+          }
         }
+
+        // Always emit the participant left event
         io.emit("participant-left", {chatId, userId, username});
         console.log("Emitted participant-left event");
       } catch (error) {
@@ -167,12 +176,29 @@ export default (io: Server) => {
           },
         });
 
-        io.emit("message-deleted", data);
+        // Broadcast to all users in the chat except the sender
+        socket.to(data.chatId).emit("message-deleted", {
+          ...data,
+          notificationMessage: `${
+            data.sender?.username || "Someone"
+          } deleted a message`,
+        });
+
         if (updatedChat) {
           io.emit("chat-updated", updatedChat);
         }
       } catch (error) {
         console.error("Error handling message deletion:", error);
+      }
+    });
+
+    // Inside your socket initialization
+    socket.on("message-deleted", async (message) => {
+      try {
+        // Broadcast the deleted message to all users in the chat
+        socket.to(message.chatId).emit("message-deleted", message);
+      } catch (error) {
+        console.error("Socket message deletion error:", error);
       }
     });
 

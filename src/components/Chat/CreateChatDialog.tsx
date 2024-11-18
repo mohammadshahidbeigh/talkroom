@@ -14,18 +14,19 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  FormHelperText,
 } from "@mui/material";
 import {useState} from "react";
 import {
   useGetAvailableUsersQuery,
   useCreateChatMutation,
 } from "../../services/apiSlice";
-import {User} from "../../types";
+import {User, CreateChatPayload} from "../../types";
 
 interface CreateChatDialogProps {
   open: boolean;
   onClose: () => void;
-  onChatCreated: () => void;
+  onChatCreated: (data: CreateChatPayload) => Promise<void>;
 }
 
 interface ApiError {
@@ -50,10 +51,14 @@ const CreateChatDialog: React.FC<CreateChatDialogProps> = ({
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
     []
   );
-  const [notification, setNotification] = useState({
+  const [notification, setNotification] = useState<{
+    open: boolean;
+    message: string;
+    severity: "error" | "success" | "info";
+  }>({
     open: false,
     message: "",
-    severity: "error" as "error" | "success",
+    severity: "success",
   });
 
   const {data: users = [], isLoading: loadingUsers} =
@@ -62,14 +67,70 @@ const CreateChatDialog: React.FC<CreateChatDialogProps> = ({
 
   const handleSubmit = async () => {
     try {
-      await createChat({
-        name,
+      // Validate participant count
+      if (selectedParticipants.length === 0) {
+        setNotification({
+          open: true,
+          message: "Please select at least one participant",
+          severity: "error",
+        });
+        return;
+      }
+
+      // Validate based on chat type
+      if (type === "direct") {
+        if (selectedParticipants.length !== 1) {
+          setNotification({
+            open: true,
+            message: "Direct chat must have exactly one participant",
+            severity: "error",
+          });
+          return;
+        }
+      } else if (type === "group") {
+        if (selectedParticipants.length < 2) {
+          setNotification({
+            open: true,
+            message: "Group chat must have at least two participants",
+            severity: "error",
+          });
+          return;
+        }
+        if (!name.trim()) {
+          setNotification({
+            open: true,
+            message: "Group chat must have a name",
+            severity: "error",
+          });
+          return;
+        }
+      }
+
+      // Prepare chat data
+      const chatData = {
+        name:
+          type === "direct"
+            ? users.find((u) => u.id === selectedParticipants[0])?.username ||
+              ""
+            : name.trim(),
         type,
         participants: selectedParticipants,
-      }).unwrap();
+      };
 
-      onChatCreated();
+      // Create chat
+      await createChat(chatData).unwrap();
+
+      setNotification({
+        open: true,
+        message: `${
+          type === "direct" ? "Chat" : "Group chat"
+        } created successfully`,
+        severity: "success",
+      });
+
+      await onChatCreated(chatData);
       onClose();
+
       // Reset form
       setName("");
       setType("direct");
@@ -77,7 +138,6 @@ const CreateChatDialog: React.FC<CreateChatDialogProps> = ({
     } catch (error) {
       console.error("Failed to create chat:", error);
 
-      // Type guard for ApiError
       const isApiError = (err: unknown): err is ApiError => {
         return (
           typeof err === "object" &&
@@ -89,18 +149,21 @@ const CreateChatDialog: React.FC<CreateChatDialogProps> = ({
       };
 
       if (isApiError(error) && error.data?.existingChat) {
-        onChatCreated(); // Refresh chat list
-        onClose();
-      } else {
-        // Show error notification
         setNotification({
           open: true,
           message:
-            isApiError(error) && error.data?.error
-              ? error.data.error
-              : "Failed to create chat",
-          severity: "error",
+            type === "direct"
+              ? "Opening existing chat..."
+              : "Opening existing group chat...",
+          severity: "info",
         });
+
+        await onChatCreated({
+          name: error.data.existingChat.name,
+          type: error.data.existingChat.type,
+          participants: error.data.existingChat.participants,
+        });
+        onClose();
       }
     }
   };
@@ -112,48 +175,76 @@ const CreateChatDialog: React.FC<CreateChatDialogProps> = ({
   return (
     <>
       <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New Chat</DialogTitle>
+        <DialogTitle>
+          Create New {type === "direct" ? "Chat" : "Group Chat"}
+        </DialogTitle>
         <DialogContent>
           <Box sx={{display: "flex", flexDirection: "column", gap: 2, mt: 2}}>
-            <TextField
-              label="Chat Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              fullWidth
-            />
-
             <FormControl fullWidth>
               <InputLabel>Type</InputLabel>
-              <Select value={type} onChange={(e) => setType(e.target.value)}>
+              <Select
+                value={type}
+                onChange={(e) => {
+                  setType(e.target.value);
+                  // Clear name when switching to direct chat
+                  if (e.target.value === "direct") {
+                    setName("");
+                  }
+                }}
+              >
                 <MenuItem value="direct">Direct Message</MenuItem>
                 <MenuItem value="group">Group Chat</MenuItem>
               </Select>
             </FormControl>
 
-            <FormControl fullWidth>
-              <InputLabel>Participants</InputLabel>
+            {type === "group" && (
+              <TextField
+                label="Group Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                fullWidth
+                required
+                error={type === "group" && !name.trim()}
+                helperText={
+                  type === "group" && !name.trim()
+                    ? "Group name is required"
+                    : ""
+                }
+              />
+            )}
+
+            <FormControl fullWidth error={selectedParticipants.length === 0}>
+              <InputLabel>
+                {type === "direct" ? "Select User" : "Select Participants"}
+              </InputLabel>
               <Select
-                multiple
+                multiple={type === "group"}
                 value={selectedParticipants}
                 onChange={(e) =>
-                  setSelectedParticipants(e.target.value as string[])
+                  setSelectedParticipants(
+                    type === "direct"
+                      ? [e.target.value as string]
+                      : (e.target.value as string[])
+                  )
                 }
                 renderValue={(selected) => (
                   <Box sx={{display: "flex", flexWrap: "wrap", gap: 0.5}}>
-                    {selected.map((value) => {
-                      const user = users.find((u: User) => u.id === value);
-                      return (
-                        <Chip
-                          key={value}
-                          label={user?.username || value}
-                          onDelete={() =>
-                            setSelectedParticipants((prev) =>
-                              prev.filter((id) => id !== value)
-                            )
-                          }
-                        />
-                      );
-                    })}
+                    {(Array.isArray(selected) ? selected : [selected]).map(
+                      (value) => {
+                        const user = users.find((u: User) => u.id === value);
+                        return (
+                          <Chip
+                            key={value}
+                            label={user?.username || value}
+                            onDelete={() =>
+                              setSelectedParticipants((prev) =>
+                                prev.filter((id) => id !== value)
+                              )
+                            }
+                          />
+                        );
+                      }
+                    )}
                   </Box>
                 )}
               >
@@ -169,6 +260,11 @@ const CreateChatDialog: React.FC<CreateChatDialogProps> = ({
                   ))
                 )}
               </Select>
+              {selectedParticipants.length === 0 && (
+                <FormHelperText>
+                  Please select {type === "direct" ? "a user" : "participants"}
+                </FormHelperText>
+              )}
             </FormControl>
           </Box>
         </DialogContent>
@@ -177,7 +273,11 @@ const CreateChatDialog: React.FC<CreateChatDialogProps> = ({
           <Button
             onClick={handleSubmit}
             variant="contained"
-            disabled={creating || !name || selectedParticipants.length === 0}
+            disabled={
+              creating ||
+              selectedParticipants.length === 0 ||
+              (type === "group" && !name.trim())
+            }
           >
             {creating ? <CircularProgress size={24} /> : "Create Chat"}
           </Button>

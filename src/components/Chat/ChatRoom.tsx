@@ -16,6 +16,28 @@ import {
 } from "../../services/apiSlice";
 import axios from "axios";
 
+interface NotificationState {
+  open: boolean;
+  message: string;
+  severity: "success" | "error" | "info" | "warning";
+}
+
+interface DeletedMessageData {
+  id: string;
+  chatId: string;
+  senderId: string;
+  type: string;
+  content: string;
+  createdAt: string;
+  sender?: {
+    id: string;
+    username: string;
+    email: string;
+    fullName: string;
+    avatarUrl?: string;
+  };
+}
+
 const ChatRoom: React.FC = () => {
   const user = useAppSelector((state) => state.auth.user);
   const socket = useSocket();
@@ -25,10 +47,10 @@ const ChatRoom: React.FC = () => {
   const [messageList, setMessageList] = useState<Message[]>([]);
   const [participants, setParticipants] = useState<User[]>([]);
   const [messageInput, setMessageInput] = useState("");
-  const [notification, setNotification] = useState({
+  const [notification, setNotification] = useState<NotificationState>({
     open: false,
     message: "",
-    severity: "success" as "success" | "error",
+    severity: "success",
   });
 
   // Use RTK Query hooks
@@ -162,13 +184,43 @@ const ChatRoom: React.FC = () => {
 
   const handleDeleteMessage = async (messageId: string) => {
     try {
+      // Call the delete mutation without storing the result
       await deleteMessage(messageId).unwrap();
-      setMessageList((prev) => prev.filter((msg) => msg.id !== messageId));
 
-      // Emit socket event for real-time deletion
-      socket?.emit("message-deleted", {
-        chatId: currentChat?.id,
-        messageId,
+      // Update local message list
+      setMessageList(
+        (prev: Message[]) =>
+          prev.map((msg: Message) =>
+            msg.id === messageId ? {...msg, type: "deleted", content: ""} : msg
+          ) as Message[]
+      );
+
+      // Create the deletion event data with proper typing
+      const deletionData: DeletedMessageData = {
+        id: messageId,
+        chatId: currentChat?.id || "",
+        senderId: user?.id || "",
+        type: "deleted",
+        content: "",
+        createdAt: new Date().toISOString(),
+        sender: user
+          ? {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              fullName: user.fullName,
+              avatarUrl: user.avatarUrl,
+            }
+          : undefined,
+      };
+
+      // Emit socket event with properly typed data
+      socket?.emit("message-deleted", deletionData);
+
+      setNotification({
+        open: true,
+        message: "Message deleted successfully",
+        severity: "success",
       });
     } catch (error) {
       console.error("Error deleting message:", error);
@@ -192,6 +244,29 @@ const ChatRoom: React.FC = () => {
             if (prev.some((m) => m.id === message.id)) {
               return prev;
             }
+
+            // Only play notification sound for new text/file messages, not system messages
+            if (message.senderId !== user?.id && message.type !== "system") {
+              try {
+                fetch("/src/public/notification.mp3")
+                  .then((response) => {
+                    if (response.ok) {
+                      const audio = new Audio("/src/public/notification.mp3");
+                      audio.play().catch((err) => {
+                        console.log("Audio playback failed:", err);
+                      });
+                    } else {
+                      console.log("Notification sound file not found");
+                    }
+                  })
+                  .catch((err) => {
+                    console.log("Failed to check for notification sound:", err);
+                  });
+              } catch (error) {
+                console.log("Error playing notification sound:", error);
+              }
+            }
+
             return [...prev, message];
           });
 
@@ -204,6 +279,26 @@ const ChatRoom: React.FC = () => {
               messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
           }, 100);
+        }
+      });
+
+      // Update message-deleted listener (remove audio)
+      socket.on("message-deleted", (data) => {
+        // Update message list
+        setMessageList(
+          (prev: Message[]) =>
+            prev.map((msg: Message) =>
+              msg.id === data.id ? {...msg, type: "deleted", content: ""} : msg
+            ) as Message[]
+        );
+
+        // Show notification for other users
+        if (data.senderId !== user?.id) {
+          setNotification({
+            open: true,
+            message: data.notificationMessage || "A message was deleted",
+            severity: "info" as const,
+          });
         }
       });
 
@@ -220,7 +315,7 @@ const ChatRoom: React.FC = () => {
         }
       });
 
-      // Handle participant leaving
+      // Handle participant leaving - removed notification sound
       socket.on("participant-left", async ({chatId, username}) => {
         console.log(`Participant ${username} left chat ${chatId}`);
         if (chatId === currentChat?.id) {
@@ -277,9 +372,10 @@ const ChatRoom: React.FC = () => {
         socket.off("message");
         socket.off("chat-updated");
         socket.off("participant-left");
+        socket.off("message-deleted");
       };
     }
-  }, [socket, currentChat]);
+  }, [socket, currentChat, user]);
 
   return (
     <Box
@@ -305,6 +401,7 @@ const ChatRoom: React.FC = () => {
         <MessageArea
           currentChat={currentChat}
           messages={messageList}
+          setMessages={setMessageList}
           participants={participants}
           messageInput={messageInput}
           setMessageInput={setMessageInput}

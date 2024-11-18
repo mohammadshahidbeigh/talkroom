@@ -183,7 +183,7 @@ const Register = () => {
             }}
           >
             <img
-              src="/svg.svg"
+              src="/src/public/svg.svg"
               alt="App Logo"
               style={{
                 marginBottom: 16,

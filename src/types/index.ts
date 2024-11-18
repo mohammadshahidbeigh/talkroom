@@ -58,10 +58,12 @@ export interface SendMessagePayload {
 }
 
 // Chat-related types
+type MessageType = "text" | "file" | "system" | "deleted";
+
 export interface Message {
   id: string;
   content: string;
-  type: "text" | "file" | "system";
+  type: MessageType;
   senderId: string;
   chatId: string;
   createdAt: string;

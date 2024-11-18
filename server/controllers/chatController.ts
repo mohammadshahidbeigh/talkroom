@@ -1,6 +1,6 @@
 import {Request, Response} from "express";
 import prisma from "../models";
-import {Prisma} from "@prisma/client";
+import {Prisma, Participant} from "@prisma/client";
 
 export const getChats = async (req: Request, res: Response) => {
   try {
@@ -44,119 +44,113 @@ export const createChat = async (req: Request, res: Response) => {
   try {
     const {name, type, participants} = req.body;
 
-    // Validate required fields
-    if (!name || !type || !participants || !Array.isArray(participants)) {
+    // Check if required fields are present
+    if (!type || !participants || !participants.length) {
       return res.status(400).json({
         error:
           "Invalid request body. Required fields: name, type, and participants array",
       });
     }
 
-    // For direct messages, check if a chat already exists between these users
-    if (type === "direct" && participants.length === 1) {
-      const existingChat = await prisma.chat.findFirst({
-        where: {
-          type: "direct",
-          AND: [
-            {
-              participants: {
-                some: {
-                  userId: req.user!.id,
-                },
+    // Check for existing chat
+    const existingChat = await prisma.chat.findFirst({
+      where: {
+        type,
+        AND: [
+          // All specified participants must be in the chat
+          ...participants.map((participantId: string) => ({
+            participants: {
+              some: {
+                userId: participantId,
               },
             },
-            {
-              participants: {
-                some: {
-                  userId: participants[0],
-                },
+          })),
+          // Current user must be in the chat
+          {
+            participants: {
+              some: {
+                userId: req.user!.id,
               },
-            },
-          ],
-        },
-        include: {
-          participants: {
-            include: {
-              user: true,
             },
           },
-        },
-      });
-
-      if (existingChat) {
-        // Check if the current user is still a participant
-        const isParticipant = existingChat.participants.some(
-          (p: { userId: string; }) => p.userId === req.user!.id
-        );
-
-        if (!isParticipant) {
-          // Re-add the user as a participant
-          await prisma.participant.create({
-            data: {
-              userId: req.user!.id,
-              chatId: existingChat.id,
-            },
-          });
-
-          // Return the updated chat
-          const updatedChat = await prisma.chat.findUnique({
-            where: {id: existingChat.id},
-            include: {
+        ],
+        // For direct chats, ensure exactly 2 participants
+        ...(type === "direct"
+          ? {
               participants: {
-                include: {
-                  user: true,
+                every: {
+                  userId: {
+                    in: [...participants, req.user!.id],
+                  },
                 },
               },
-            },
-          });
+            }
+          : {}),
+      },
+      include: {
+        participants: {
+          include: {
+            user: true,
+          },
+        },
+        messages: {
+          include: {
+            sender: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
+        },
+      },
+    });
 
-          return res.json(updatedChat);
-        }
-
-        return res.status(400).json({
-          error: "A direct message chat already exists with this user",
-          existingChat,
-        });
-      }
+    if (existingChat) {
+      return res.status(400).json({
+        error:
+          type === "direct"
+            ? "A chat with this user already exists"
+            : "A group with these participants already exists",
+        existingChat: {
+          id: existingChat.id,
+          name: existingChat.name || "",
+          type: existingChat.type,
+          participants: existingChat.participants.map(
+            (p: Participant) => p.userId
+          ),
+        },
+      });
     }
 
-    // Create new chat if no existing chat found
+    // Create new chat if it doesn't exist
     const chat = await prisma.chat.create({
       data: {
-        name,
+        name: type === "direct" ? "" : name,
         type,
         participants: {
           create: [
-            {userId: req.user!.id}, // Add current user
-            ...participants.map((userId: string) => ({userId})),
+            {userId: req.user!.id},
+            ...participants.map((participantId: string) => ({
+              userId: participantId,
+            })),
           ],
         },
       },
       include: {
         participants: {
           include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                email: true,
-              },
-            },
+            user: true,
           },
         },
       },
     });
 
+    // Emit socket event for real-time updates
+    req.io?.emit("chat-created", chat);
+
     res.json(chat);
   } catch (error) {
     console.error("Create chat error:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2002") {
-        return res.status(400).json({error: "Chat already exists"});
-      } else if (error.code === "P2003") {
-        return res.status(400).json({error: "Invalid participant reference"});
-      }
-    }
     res.status(500).json({error: "Failed to create chat"});
   }
 };
@@ -276,17 +270,22 @@ export const deleteChat = async (req: Request, res: Response) => {
 
     // If this was the last participant, then delete the entire chat
     if (chat.participants.length === 1) {
-      await prisma.$transaction(async (tx: { message: { deleteMany: (arg0: { where: { chatId: string; }; }) => any; }; chat: { delete: (arg0: { where: { id: string; }; }) => any; }; }) => {
-        // Delete all messages first
-        await tx.message.deleteMany({
-          where: {chatId: id},
-        });
+      await prisma.$transaction(
+        async (tx: {
+          message: {deleteMany: (arg0: {where: {chatId: string}}) => any};
+          chat: {delete: (arg0: {where: {id: string}}) => any};
+        }) => {
+          // Delete all messages first
+          await tx.message.deleteMany({
+            where: {chatId: id},
+          });
 
-        // Delete the chat
-        await tx.chat.delete({
-          where: {id},
-        });
-      });
+          // Delete the chat
+          await tx.chat.delete({
+            where: {id},
+          });
+        }
+      );
     }
   } catch (error) {
     console.error("Delete chat error:", error);

@@ -45,6 +45,12 @@ app.use((req, res, next) => {
   next();
 });
 
+// Add this middleware before your routes
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
 // Register routes
 app.use("/auth", authRoutes);
 app.use("/chat", chatRoutes);

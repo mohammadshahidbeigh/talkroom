@@ -10,6 +10,8 @@ import {
   Menu,
   MenuItem,
   CircularProgress,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import {
   FiSend,
@@ -22,6 +24,7 @@ import {
   FiCopy,
   FiLock,
   FiCheck,
+  FiAlertCircle,
 } from "react-icons/fi";
 import {Chat, Message} from "../../types";
 import {useRef, useEffect, useState} from "react";
@@ -38,6 +41,7 @@ interface MessageSender {
 interface MessageAreaProps {
   currentChat: Chat | null;
   messages: Message[];
+  setMessages: (messages: Message[]) => void;
   participants: {
     id: string;
     username: string;
@@ -68,6 +72,7 @@ const HiddenInput = styled("input")({
 const MessageArea: React.FC<MessageAreaProps> = ({
   currentChat,
   messages,
+  setMessages,
   participants,
   messageInput,
   setMessageInput,
@@ -87,6 +92,15 @@ const MessageArea: React.FC<MessageAreaProps> = ({
   const [downloadStatus, setDownloadStatus] = useState<DownloadStatus>({
     messageId: "",
     status: null,
+  });
+  const [notification, setNotification] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error" | "info";
+  }>({
+    open: false,
+    message: "",
+    severity: "success",
   });
 
   const scrollToBottom = () => {
@@ -155,8 +169,18 @@ const MessageArea: React.FC<MessageAreaProps> = ({
           url: previewUrl,
           type: file.type.split("/")[0],
         });
+        setNotification({
+          open: true,
+          message: "File selected and ready to upload",
+          severity: "info",
+        });
       } catch (error) {
         console.error("Error creating file preview:", error);
+        setNotification({
+          open: true,
+          message: "Failed to preview file",
+          severity: "error",
+        });
       }
     }
   };
@@ -248,8 +272,17 @@ const MessageArea: React.FC<MessageAreaProps> = ({
   ) => {
     try {
       setDownloadStatus({messageId, status: "downloading"});
+      setNotification({
+        open: true,
+        message: "Downloading file...",
+        severity: "info",
+      });
 
       const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error("Download failed");
+      }
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -261,6 +294,11 @@ const MessageArea: React.FC<MessageAreaProps> = ({
       window.URL.revokeObjectURL(url);
 
       setDownloadStatus({messageId, status: "success"});
+      setNotification({
+        open: true,
+        message: "File downloaded successfully!",
+        severity: "success",
+      });
 
       setTimeout(() => {
         setDownloadStatus({messageId, status: "hidden"});
@@ -274,6 +312,11 @@ const MessageArea: React.FC<MessageAreaProps> = ({
     } catch (error) {
       console.error("Download failed:", error);
       setDownloadStatus({messageId: "", status: null});
+      setNotification({
+        open: true,
+        message: "Failed to download file. Please try again.",
+        severity: "error",
+      });
     }
   };
 
@@ -448,6 +491,30 @@ const MessageArea: React.FC<MessageAreaProps> = ({
       }
     }
 
+    if (message.type === "deleted") {
+      return (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            color: "text.disabled",
+            fontStyle: "italic",
+            bgcolor: "action.hover",
+            px: 2,
+            py: 1,
+            borderRadius: 1,
+          }}
+        >
+          <FiAlertCircle size={16} />
+          <Typography variant="body2">This message has been deleted</Typography>
+          <Typography variant="caption" sx={{ml: "auto", opacity: 0.7}}>
+            {formatTime(message.createdAt)}
+          </Typography>
+        </Box>
+      );
+    }
+
     return <Typography variant="body1">{message.content}</Typography>;
   };
 
@@ -486,6 +553,11 @@ const MessageArea: React.FC<MessageAreaProps> = ({
   const handleCopyMessage = () => {
     if (selectedMessage) {
       navigator.clipboard.writeText(selectedMessage.content);
+      setNotification({
+        open: true,
+        message: "Message copied to clipboard",
+        severity: "success",
+      });
     }
     handleCloseContextMenu();
   };
@@ -494,8 +566,19 @@ const MessageArea: React.FC<MessageAreaProps> = ({
     if (selectedMessage) {
       try {
         await onDeleteMessage(selectedMessage.id);
+        const updatedMessages = messages.map((msg) =>
+          msg.id === selectedMessage.id
+            ? {...msg, type: "deleted" as const, content: ""}
+            : msg
+        );
+        setMessages(updatedMessages);
       } catch (error) {
         console.error("Error deleting message:", error);
+        setNotification({
+          open: true,
+          message: "Failed to delete message",
+          severity: "error",
+        });
       }
     }
     handleCloseContextMenu();
@@ -560,13 +643,21 @@ const MessageArea: React.FC<MessageAreaProps> = ({
             sx={{
               display: "flex",
               alignItems: "center",
-              gap: 0.5,
+              gap: 1,
               color: "success.main",
-              fontSize: "0.75rem",
+              fontSize: "0.875rem",
             }}
           >
-            <FiLock size={12} />
-            <Typography variant="caption">End-to-end encrypted</Typography>
+            <FiLock size={16} />
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 500,
+                letterSpacing: 0.25,
+              }}
+            >
+              End-to-end encrypted
+            </Typography>
           </Box>
         </Box>
         <Typography variant="body2" color="text.secondary">
@@ -750,6 +841,21 @@ const MessageArea: React.FC<MessageAreaProps> = ({
           <EmojiPicker onEmojiClick={handleEmojiClick} />
         </Popover>
       </Box>
+
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={3000}
+        onClose={() => setNotification((prev) => ({...prev, open: false}))}
+        anchorOrigin={{vertical: "top", horizontal: "center"}}
+      >
+        <Alert
+          onClose={() => setNotification((prev) => ({...prev, open: false}))}
+          severity={notification.severity}
+          sx={{width: "100%"}}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

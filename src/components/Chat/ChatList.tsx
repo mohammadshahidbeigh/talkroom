@@ -15,13 +15,19 @@ import {
   MenuItem,
   Snackbar,
   Alert,
+  Chip,
 } from "@mui/material";
 import {FiSearch, FiPlus, FiMoreVertical, FiTrash2} from "react-icons/fi";
-import {Chat} from "../../types";
+import {Chat, CreateChatPayload} from "../../types";
 import {useState, useEffect} from "react";
 import CreateChatDialog from "./CreateChatDialog";
-import {useGetChatsQuery, useDeleteChatMutation} from "../../services/apiSlice";
+import {
+  useGetChatsQuery,
+  useDeleteChatMutation,
+  useCreateChatMutation,
+} from "../../services/apiSlice";
 import useSocket from "../../hooks/useSocket"; // Use default import instead of named import
+import useAppSelector from "../../hooks/useAppSelector";
 
 interface ChatListProps {
   currentChat: Chat | null;
@@ -54,8 +60,9 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
   const [notification, setNotification] = useState<NotificationState>({
     open: false,
     message: "",
-    severity: "success",
+    severity: "info",
   });
+  const currentUser = useAppSelector((state) => state.auth.user);
 
   const {
     data: chats = [],
@@ -66,6 +73,7 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
   });
 
   const [deleteChat] = useDeleteChatMutation();
+  const [createChat] = useCreateChatMutation();
 
   useEffect(() => {
     setLocalChats(chats);
@@ -85,10 +93,11 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
         refetch();
       });
 
-      // Handle participant leaving
+      // Handle participant leaving - removed notification sound
       socket.on("participant-left", ({username}) => {
         console.log(`${username} left chat, refreshing list`);
         refetch();
+        // Show only visual notification
         setNotification({
           open: true,
           message: `${username} left the chat`,
@@ -138,9 +147,15 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
   };
 
   const getChatDisplayName = (chat: Chat) => {
-    if (chat.name) return chat.name;
-    const participantName = chat.participants?.[0]?.user?.username;
-    return participantName || "Chat";
+    if (chat.type === "group") {
+      return chat.name || "Group Chat";
+    }
+
+    // For direct chats, show the other participant's name
+    const otherParticipant = chat.participants.find(
+      (p) => p.user.id !== currentUser?.id
+    );
+    return otherParticipant?.user.username || "Chat";
   };
 
   const getAvatarInitial = (chat: Chat) => {
@@ -211,6 +226,114 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
     handleCloseContextMenu();
   };
 
+  const checkChatExists = (participants: string[], type: string): boolean => {
+    return chats.some((chat) => {
+      if (type === "direct" && chat.type === "direct") {
+        // For direct chats, check if the same two users are involved
+        const chatParticipantIds = chat.participants
+          .map((p) => p.userId)
+          .sort();
+        const newParticipantIds = [...participants].sort();
+        return (
+          JSON.stringify(chatParticipantIds) ===
+          JSON.stringify(newParticipantIds)
+        );
+      } else if (type === "group" && chat.type === "group") {
+        // For group chats, check if the same participants and name exist
+        const chatParticipantIds = chat.participants
+          .map((p) => p.userId)
+          .sort();
+        const newParticipantIds = [...participants].sort();
+        return (
+          JSON.stringify(chatParticipantIds) ===
+          JSON.stringify(newParticipantIds)
+        );
+      }
+      return false;
+    });
+  };
+
+  const handleCreateChat = async (data: CreateChatPayload) => {
+    try {
+      // Check if chat already exists
+      if (checkChatExists(data.participants, data.type)) {
+        setNotification({
+          open: true,
+          message:
+            data.type === "direct"
+              ? "Opening existing chat..."
+              : "Opening existing group chat...",
+          severity: "info",
+        });
+
+        // Find the existing chat
+        const existingChat = chats.find((chat) => {
+          if (data.type === "direct" && chat.type === "direct") {
+            const chatParticipantIds = chat.participants
+              .map((p) => p.userId)
+              .sort();
+            const newParticipantIds = [...data.participants].sort();
+            return (
+              JSON.stringify(chatParticipantIds) ===
+              JSON.stringify(newParticipantIds)
+            );
+          }
+          return false;
+        });
+
+        if (existingChat) {
+          onChatSelect(existingChat);
+          setCreateDialogOpen(false);
+        }
+        return;
+      }
+
+      const response = await createChat(data).unwrap();
+      onChatSelect(response);
+      setCreateDialogOpen(false);
+    } catch (error) {
+      // Just log the error without showing notification
+      console.error("Error creating chat:", error);
+    }
+  };
+
+  const renderChatLabel = (chat: Chat) => {
+    if (chat.type === "group") {
+      return (
+        <Chip
+          label="G"
+          size="small"
+          color="primary"
+          variant="outlined"
+          sx={{
+            height: "20px",
+            fontSize: "0.75rem",
+            position: "absolute",
+            left: "8px",
+            zIndex: 1,
+          }}
+        />
+      );
+    } else if (chat.type === "direct") {
+      return (
+        <Chip
+          label="D"
+          size="small"
+          color="secondary"
+          variant="outlined"
+          sx={{
+            height: "20px",
+            fontSize: "0.75rem",
+            position: "absolute",
+            left: "8px",
+            zIndex: 1,
+          }}
+        />
+      );
+    }
+    return null;
+  };
+
   return (
     <Box
       sx={{
@@ -269,8 +392,10 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
                 bgcolor:
                   currentChat?.id === chat.id ? "action.selected" : "inherit",
                 position: "relative",
+                pl: 6,
               }}
             >
+              {renderChatLabel(chat)}
               <ListItemAvatar>
                 <Badge
                   overlap="circular"
@@ -285,9 +410,11 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
               </ListItemAvatar>
               <ListItemText
                 primary={
-                  <Typography variant="subtitle1" noWrap>
-                    {getChatDisplayName(chat)}
-                  </Typography>
+                  <Box sx={{display: "flex", alignItems: "center"}}>
+                    <Typography variant="subtitle1" noWrap>
+                      {getChatDisplayName(chat)}
+                    </Typography>
+                  </Box>
                 }
                 secondary={
                   <Typography variant="body2" color="text.secondary" noWrap>
@@ -332,7 +459,7 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
       <CreateChatDialog
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
-        onChatCreated={() => {}}
+        onChatCreated={handleCreateChat}
       />
 
       <Snackbar

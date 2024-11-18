@@ -35,7 +35,7 @@ const Sidebar = () => {
     >
       <Box sx={{p: 3, display: "flex", alignItems: "center", gap: 2}}>
         <img
-          src="/logo.png"
+          src="/src/public/logo.png"
           alt="App Logo"
           style={{width: "40px", height: "auto"}}
         />

@@ -76,29 +76,35 @@ export const deleteMessage = async (req: Request, res: Response) => {
   try {
     const {id} = req.params;
 
-    // Check if message exists and belongs to user
-    const message = await prisma.message.findUnique({
+    // Update the message instead of deleting it
+    const updatedMessage = await prisma.message.update({
       where: {id},
-      select: {senderId: true},
+      data: {
+        type: "deleted",
+        content: "", // Clear the content
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            fullName: true,
+            avatarUrl: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
     });
 
-    if (!message) {
-      return res.status(404).json({error: "Message not found"});
-    }
+    // Emit socket event with the updated message
+    req.io?.to(updatedMessage.chatId).emit("message-deleted", updatedMessage);
 
-    if (message.senderId !== req.user!.id) {
-      return res
-        .status(403)
-        .json({error: "Not authorized to delete this message"});
-    }
-
-    await prisma.message.delete({
-      where: {id},
-    });
-
-    res.status(204).send();
+    res.json(updatedMessage);
   } catch (error) {
-    console.error("Error deleting message:", error);
+    console.error("Delete message error:", error);
     res.status(500).json({error: "Failed to delete message"});
   }
 };
