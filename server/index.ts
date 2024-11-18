@@ -35,7 +35,15 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({limit: "500mb"}));
+app.use(express.urlencoded({extended: true, limit: "500mb"}));
+
+// Increase timeout for large file transfers
+app.use((req, res, next) => {
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("Keep-Alive", "timeout=300");
+  next();
+});
 
 // Register routes
 app.use("/auth", authRoutes);
@@ -43,7 +51,7 @@ app.use("/chat", chatRoutes);
 app.use("/user", userRoutes);
 app.use("/video", videoRoutes);
 app.use("/message", messageRoutes);
-app.use("/upload", uploadRoutes);
+app.use("/", uploadRoutes);
 
 // Error handling middleware for JSON parsing errors
 const jsonErrorHandler: ErrorRequestHandler = (err, req, res, next) => {

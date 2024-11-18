@@ -9,6 +9,7 @@ import {
   Popover,
   Menu,
   MenuItem,
+  CircularProgress,
 } from "@mui/material";
 import {
   FiSend,
@@ -20,6 +21,7 @@ import {
   FiTrash2,
   FiCopy,
   FiLock,
+  FiCheck,
 } from "react-icons/fi";
 import {Chat, Message} from "../../types";
 import {useRef, useEffect, useState} from "react";
@@ -54,6 +56,11 @@ interface FilePreview {
   type: string;
 }
 
+interface DownloadStatus {
+  messageId: string;
+  status: "downloading" | "success" | "hidden" | null;
+}
+
 const HiddenInput = styled("input")({
   display: "none",
 });
@@ -77,6 +84,10 @@ const MessageArea: React.FC<MessageAreaProps> = ({
     mouseX: number;
     mouseY: number;
   } | null>(null);
+  const [downloadStatus, setDownloadStatus] = useState<DownloadStatus>({
+    messageId: "",
+    status: null,
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({behavior: "smooth"});
@@ -230,6 +241,87 @@ const MessageArea: React.FC<MessageAreaProps> = ({
     );
   };
 
+  const handleDownload = async (
+    messageId: string,
+    fileUrl: string,
+    fileName: string
+  ) => {
+    try {
+      setDownloadStatus({messageId, status: "downloading"});
+
+      const response = await fetch(fileUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      setDownloadStatus({messageId, status: "success"});
+
+      setTimeout(() => {
+        setDownloadStatus({messageId, status: "hidden"});
+      }, 2000);
+
+      const downloadedFiles = JSON.parse(
+        localStorage.getItem("downloadedFiles") || "{}"
+      );
+      downloadedFiles[messageId] = true;
+      localStorage.setItem("downloadedFiles", JSON.stringify(downloadedFiles));
+    } catch (error) {
+      console.error("Download failed:", error);
+      setDownloadStatus({messageId: "", status: null});
+    }
+  };
+
+  const renderDownloadButton = (
+    messageId: string,
+    fileUrl: string,
+    fileName: string,
+    isCurrentUser: boolean
+  ) => {
+    if (isCurrentUser) {
+      return null;
+    }
+
+    const isDownloading =
+      downloadStatus.messageId === messageId &&
+      downloadStatus.status === "downloading";
+    const isSuccess =
+      downloadStatus.messageId === messageId &&
+      downloadStatus.status === "success";
+    const isHidden =
+      downloadStatus.messageId === messageId &&
+      downloadStatus.status === "hidden";
+
+    if (isHidden) {
+      return null;
+    }
+
+    return (
+      <IconButton
+        size="small"
+        onClick={() => handleDownload(messageId, fileUrl, fileName)}
+        disabled={isDownloading}
+        sx={{
+          color: "primary.main",
+          position: "relative",
+        }}
+      >
+        {isDownloading ? (
+          <CircularProgress size={16} color="inherit" />
+        ) : isSuccess ? (
+          <FiCheck style={{color: "#4caf50"}} />
+        ) : (
+          <FiDownload />
+        )}
+      </IconButton>
+    );
+  };
+
   const renderMessage = (
     message: Message,
     _sender: MessageSender,
@@ -263,7 +355,9 @@ const MessageArea: React.FC<MessageAreaProps> = ({
     }
 
     if (message.type === "file") {
-      const fileExtension = message.content.split(".").pop()?.toLowerCase();
+      const fileUrl = message.content;
+      const fileName = decodeURIComponent(fileUrl.split("/").pop() || "");
+      const fileExtension = fileName.split(".").pop()?.toLowerCase();
       const isImage = ["jpg", "jpeg", "png", "gif", "webp"].includes(
         fileExtension || ""
       );
@@ -273,27 +367,33 @@ const MessageArea: React.FC<MessageAreaProps> = ({
         return (
           <Box sx={{maxWidth: "300px"}}>
             <img
-              src={message.content}
+              src={fileUrl}
               alt="Shared image"
               style={{
                 width: "100%",
                 height: "auto",
                 borderRadius: "4px",
                 marginBottom: "4px",
+                cursor: !isCurrentUser ? "pointer" : "default",
               }}
               loading="lazy"
+              onClick={() =>
+                !isCurrentUser && handleDownload(message.id, fileUrl, fileName)
+              }
+              onError={(e) => {
+                const img = e.target as HTMLImageElement;
+                img.onerror = null;
+                img.src = "/placeholder-image.png";
+              }}
             />
             <Box sx={{display: "flex", alignItems: "center", gap: 1}}>
-              <Typography variant="caption">
-                {message.content.split("/").pop()}
-              </Typography>
-              <IconButton
-                size="small"
-                onClick={() => window.open(message.content, "_blank")}
-                sx={{color: isCurrentUser ? "inherit" : "primary.main"}}
-              >
-                <FiDownload />
-              </IconButton>
+              <Typography variant="caption">{fileName}</Typography>
+              {renderDownloadButton(
+                message.id,
+                fileUrl,
+                fileName,
+                isCurrentUser
+              )}
             </Box>
           </Box>
         );
@@ -301,7 +401,7 @@ const MessageArea: React.FC<MessageAreaProps> = ({
         return (
           <Box sx={{maxWidth: "300px"}}>
             <video
-              src={message.content}
+              src={fileUrl}
               controls
               style={{
                 width: "100%",
@@ -311,21 +411,43 @@ const MessageArea: React.FC<MessageAreaProps> = ({
               }}
             />
             <Box sx={{display: "flex", alignItems: "center", gap: 1}}>
-              <Typography variant="caption">
-                {message.content.split("/").pop()}
-              </Typography>
-              <IconButton
-                size="small"
-                onClick={() => window.open(message.content, "_blank")}
-                sx={{color: isCurrentUser ? "inherit" : "primary.main"}}
-              >
-                <FiDownload />
-              </IconButton>
+              <Typography variant="caption">{fileName}</Typography>
+              {renderDownloadButton(
+                message.id,
+                fileUrl,
+                fileName,
+                isCurrentUser
+              )}
             </Box>
+          </Box>
+        );
+      } else {
+        return (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              maxWidth: "300px",
+            }}
+          >
+            <FiPaperclip size={24} />
+            <Box
+              sx={{
+                flexGrow: 1,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <Typography variant="body2">{fileName}</Typography>
+            </Box>
+            {renderDownloadButton(message.id, fileUrl, fileName, isCurrentUser)}
           </Box>
         );
       }
     }
+
     return <Typography variant="body1">{message.content}</Typography>;
   };
 
@@ -378,6 +500,18 @@ const MessageArea: React.FC<MessageAreaProps> = ({
     }
     handleCloseContextMenu();
   };
+
+  useEffect(() => {
+    const downloadedFiles = JSON.parse(
+      localStorage.getItem("downloadedFiles") || "{}"
+    );
+
+    Object.keys(downloadedFiles).forEach((messageId) => {
+      if (downloadedFiles[messageId]) {
+        setDownloadStatus({messageId, status: "hidden"});
+      }
+    });
+  }, []);
 
   if (!currentChat) {
     return (

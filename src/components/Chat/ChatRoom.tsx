@@ -2,7 +2,7 @@
 import {Box, Snackbar, Alert} from "@mui/material";
 import {Sidebar} from "../Layout";
 import {useEffect, useState} from "react";
-import useSocket from "../../hooks/useSocket"; 
+import useSocket from "../../hooks/useSocket";
 import {messageApi} from "../../services/api";
 import useAppSelector from "../../hooks/useAppSelector";
 import {Chat, Message, User} from "../../types";
@@ -14,6 +14,7 @@ import {
   useDeleteMessageMutation,
   useGetMessagesQuery,
 } from "../../services/apiSlice";
+import axios from "axios";
 
 const ChatRoom: React.FC = () => {
   const user = useAppSelector((state) => state.auth.user);
@@ -80,6 +81,16 @@ const ChatRoom: React.FC = () => {
   const handleFileUpload = async (file: File) => {
     if (!currentChat || !user) return;
 
+    // Update file size validation on client side to 500MB
+    if (file.size > 500 * 1024 * 1024) {
+      setNotification({
+        open: true,
+        message: "File size exceeds 500MB limit",
+        severity: "error",
+      });
+      return;
+    }
+
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -88,29 +99,41 @@ const ChatRoom: React.FC = () => {
         headers: {
           "Content-Type": "multipart/form-data",
         },
+        // Increase timeout for large files
+        timeout: 600000, // 10 minutes
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / (progressEvent.total || file.size)
+          );
+          console.log(`Upload progress: ${percentCompleted}%`);
+          // You could update UI to show progress here
+        },
       });
 
-      if (!uploadResponse.data.url) {
+      if (!uploadResponse.data?.url) {
         throw new Error("File upload failed");
       }
 
-      // Send message with file URL using RTK Query
+      // Send message with file URL
       const response = await sendMessage({
         chatId: currentChat.id,
         content: uploadResponse.data.url,
         type: "file",
       }).unwrap();
 
-      // Update message list
       setMessageList((prev) => [...prev, response]);
-
-      // Emit socket event for real-time
       socket?.emit("message", response);
     } catch (error) {
       console.error("Error uploading file:", error);
+      let errorMessage = "Failed to upload file";
+
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.error || errorMessage;
+      }
+
       setNotification({
         open: true,
-        message: "Failed to upload file",
+        message: errorMessage,
         severity: "error",
       });
     }

@@ -27,9 +27,55 @@ const storage = multer.memoryStorage();
 export const upload = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 500 * 1024 * 1024, // Increase to 500MB limit
   },
-});
+  fileFilter: (req, file, cb) => {
+    // Add file type validation
+    const allowedMimes = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "video/mp4",
+      "video/webm",
+      "video/quicktime",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type"));
+    }
+  },
+}).single("file");
+
+// Wrap the upload middleware to handle errors
+export const uploadMiddleware = (
+  req: Request,
+  res: Response,
+  next: Function
+) => {
+  upload(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({
+          error: "File too large. Maximum size is 500MB",
+        });
+      }
+      return res.status(400).json({
+        error: `Upload error: ${err.message}`,
+      });
+    } else if (err) {
+      return res.status(400).json({
+        error: err.message,
+      });
+    }
+    next();
+  });
+};
 
 // Helper function to determine content disposition
 const getContentDisposition = (mimetype: string, filename: string): string => {
@@ -62,54 +108,39 @@ export const uploadFile = async (
     const multerReq = req as MulterRequest;
     const file = multerReq.file;
 
-    console.log("Received file:", file);
-
     if (!file || !multerReq.user?.id) {
-      console.error("No file uploaded or user not authenticated");
       res
         .status(400)
         .json({error: "No file uploaded or user not authenticated"});
       return;
     }
 
-    // Store file in database
-    const dbFile = await prisma.$queryRaw<FileQueryResult[]>`
-      INSERT INTO "File" (
-        id,
-        filename,
-        mimetype,
-        data,
-        size,
-        "uploadedBy",
-        "createdAt"
-      ) VALUES (
-        gen_random_uuid(),
-        ${file.originalname},
-        ${file.mimetype},
-        ${file.buffer},
-        ${file.size},
-        ${multerReq.user.id},
-        NOW()
-      ) RETURNING id, filename, mimetype, data, size`;
-
-    console.log("File stored in DB:", {
-      id: dbFile[0].id,
-      filename: dbFile[0].filename,
-      size: dbFile[0].size,
+    // Create file record using Prisma client instead of raw query
+    const dbFile = await prisma.file.create({
+      data: {
+        filename: file.originalname,
+        mimetype: file.mimetype,
+        data: file.buffer,
+        size: file.size,
+        uploadedBy: multerReq.user.id,
+      },
+      select: {
+        id: true,
+        filename: true,
+        mimetype: true,
+        size: true,
+      },
     });
 
-    // Generate URL
-    const safeFilename = encodeURIComponent(file.originalname);
+    // Generate URL using the file ID
     const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${
-      dbFile[0].id
-    }/${safeFilename}`;
-
-    console.log("Generated URL:", fileUrl);
+      dbFile.id
+    }/${encodeURIComponent(file.originalname)}`;
 
     res.json({
       success: true,
       url: fileUrl,
-      fileId: dbFile[0].id,
+      fileId: dbFile.id,
       filename: file.originalname,
       mimetype: file.mimetype,
       size: file.size,
@@ -123,20 +154,29 @@ export const uploadFile = async (
 export const getFile = async (req: Request, res: Response): Promise<void> => {
   try {
     const {id} = req.params;
-    const files = await prisma.$queryRaw<FileQueryResult[]>`
-      SELECT id, filename, mimetype, data, size 
-      FROM "File" 
-      WHERE id = ${id}
-    `;
 
-    if (!files || files.length === 0) {
+    // Add input validation
+    if (!id || typeof id !== "string") {
+      res.status(400).json({error: "Invalid file ID"});
+      return;
+    }
+
+    const file = await prisma.file.findUnique({
+      where: {id},
+      select: {
+        filename: true,
+        mimetype: true,
+        data: true,
+        size: true,
+      },
+    });
+
+    if (!file) {
       res.status(404).json({error: "File not found"});
       return;
     }
 
-    const file = files[0];
-
-    // Set headers for proper file handling
+    // Set appropriate headers for the file
     res.set({
       "Content-Type": file.mimetype,
       "Content-Disposition": getContentDisposition(
@@ -145,9 +185,9 @@ export const getFile = async (req: Request, res: Response): Promise<void> => {
       ),
       "Content-Length": file.size,
       "Cache-Control": "public, max-age=31536000",
-      "Accept-Ranges": "bytes",
     });
 
+    // Send the file data
     res.send(file.data);
   } catch (error) {
     console.error("File retrieval error:", error);
