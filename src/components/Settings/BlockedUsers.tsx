@@ -11,6 +11,7 @@ import {FiUserCheck} from "react-icons/fi";
 interface BlockedUser {
   userId: string;
   chatId: string;
+  username: string;
 }
 
 interface BlockedUsersProps {
@@ -44,7 +45,7 @@ const BlockedUsers: React.FC<BlockedUsersProps> = ({
               </IconButton>
             }
           >
-            <ListItemText primary={blocked.userId} />
+            <ListItemText primary={blocked.username} />
           </ListItem>
         ))}
         {blockedUsers.length === 0 && (

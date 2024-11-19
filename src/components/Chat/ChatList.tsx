@@ -67,6 +67,7 @@ interface ChatParticipant {
 interface BlockedUser {
   userId: string;
   chatId: string;
+  username: string;
 }
 
 const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
@@ -171,6 +172,7 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
       const newBlockedUser = {
         userId: otherParticipant.user.id,
         chatId: chat.id,
+        username: otherParticipant.user.username,
       };
 
       setBlockedUsers((prev) => {
@@ -375,18 +377,35 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
 
   // Add unblock function
   const handleUnblockUser = (userId: string) => {
+    // Find the blocked user before removing
+    const blockedUser = blockedUsers.find((bu) => bu.userId === userId);
+
     setBlockedUsers((prev) => {
       const updated = prev.filter((bu) => bu.userId !== userId);
       localStorage.setItem("blockedUsers", JSON.stringify(updated));
       return updated;
     });
 
-    // Refresh chat list to show unblocked chats
-    refetch();
+    // Find the original chat in chats array
+    const unmuteChat = chats.find((chat) =>
+      chat.participants.some((p) => p.user.id === userId)
+    );
+
+    if (unmuteChat) {
+      // Add chat back to local chats
+      setLocalChats((prev) => {
+        if (prev.some((chat) => chat.id === unmuteChat.id)) {
+          return prev;
+        }
+        return [...prev, unmuteChat];
+      });
+    }
 
     setNotification({
       open: true,
-      message: "User unmuted successfully",
+      message: blockedUser
+        ? `Unmuted ${blockedUser.username}`
+        : "User unmuted successfully",
       severity: "success",
     });
   };
