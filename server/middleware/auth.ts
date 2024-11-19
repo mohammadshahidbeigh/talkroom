@@ -1,7 +1,8 @@
 import {Request, Response, NextFunction} from "express";
 import jwt from "jsonwebtoken";
-import prisma from "../models";
+import {getUserSession} from "../services/redis";
 import config from "../config/default";
+import prisma from "../models";
 
 interface JwtPayload {
   userId: string;
@@ -15,24 +16,32 @@ export const auth = async (
   try {
     const token = req.header("Authorization")?.replace("Bearer ", "");
     if (!token) {
-      res.status(401).json({error: "No token provided"});
-      return;
+      throw new Error();
     }
 
-    const decoded = jwt.verify(token, config.jwtSecret as string) as JwtPayload;
+    const decoded = jwt.verify(token, config.jwtSecret as string) as {
+      userId: string;
+    };
+
+    // Check Redis session
+    const session = await getUserSession(decoded.userId);
+    if (!session) {
+      throw new Error("Session expired");
+    }
+
+    // Get user data including username
     const user = await prisma.user.findUnique({
       where: {id: decoded.userId},
+      select: {id: true, username: true, email: true},
     });
 
     if (!user) {
-      res.status(401).json({error: "User not found"});
-      return;
+      throw new Error("User not found");
     }
 
     req.user = user;
     next();
-  } catch (err) {
-    const error = err instanceof Error ? err.message : "Invalid token";
-    res.status(401).json({error});
+  } catch (error) {
+    res.status(401).json({error: "Please authenticate"});
   }
 };

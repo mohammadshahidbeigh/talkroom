@@ -1,17 +1,30 @@
 import dotenv from "dotenv";
+import {cleanEnv, str, port, url} from "envalid";
 
 dotenv.config();
 
+const env = cleanEnv(process.env, {
+  JWT_SECRET: str(),
+  DATABASE_URL: url(),
+  REDIS_HOST: str({default: "localhost"}),
+  REDIS_PORT: port({default: 6379}),
+  NODE_ENV: str({
+    choices: ["development", "test", "production"],
+    default: "development",
+  }),
+});
+
 export default {
-  jwtSecret: process.env.JWT_SECRET,
-  databaseUrl: process.env.DATABASE_URL,
+  jwtSecret: env.JWT_SECRET,
+  databaseUrl: env.DATABASE_URL,
   redis: {
-    host: process.env.REDIS_HOST || "localhost",
-    port: parseInt(process.env.REDIS_PORT || "6379"),
+    host: env.REDIS_HOST,
+    port: env.REDIS_PORT,
     ttl: {
-      session: 24 * 60 * 60, // 24 hours
-      cache: 3600, // 1 hour
-      rateLimit: 60, // 1 minute
+      session: 24 * 60 * 60,
+      cache: 3600,
+      rateLimit: 60,
     },
   },
+  isProduction: env.NODE_ENV === "production",
 };

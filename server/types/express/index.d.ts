@@ -4,8 +4,12 @@ import {User} from "@prisma/client";
 declare global {
   namespace Express {
     interface Request {
-      user?: User;
-      io?: Server;
+      user?: {
+        id: string;
+        username?: string;
+        email?: string;
+      };
+      io?: any;
     }
   }
 }
