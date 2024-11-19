@@ -15,6 +15,7 @@ import metricsRoutes from "./routes/metrics";
 import {rateLimiter} from "./middleware/rateLimiter";
 import {securityMiddleware} from "./middleware/security";
 import {MAX_REQUESTS_PER_MINUTE} from "./middleware/rateLimiter";
+import {staticMiddleware} from "./middleware/static";
 
 const app = express();
 const server = http.createServer(app);
@@ -35,7 +36,14 @@ app.use(
     origin: "http://localhost:5173",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Origin",
+      "X-Requested-With",
+      "Accept",
+    ],
+    exposedHeaders: ["Content-Disposition"],
   })
 );
 
@@ -62,6 +70,9 @@ app.use(securityMiddleware);
 app.use("/auth", rateLimiter(MAX_REQUESTS_PER_MINUTE.auth));
 app.use("/upload", rateLimiter(MAX_REQUESTS_PER_MINUTE.upload));
 app.use(rateLimiter()); // Default limit for other routes
+
+// Apply static middleware (use spread operator since it's now an array)
+app.use("/uploads", ...staticMiddleware);
 
 // Register routes
 app.use("/auth", authRoutes);
