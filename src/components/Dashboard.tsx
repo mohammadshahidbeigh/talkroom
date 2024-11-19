@@ -154,6 +154,14 @@ const Dashboard = () => {
         updateMetrics(); // Refresh metrics when video room ends
       });
 
+      socket.on("video-room-joined", () => {
+        updateMetrics(); // Add this handler to update metrics when someone joins a room
+      });
+
+      socket.on("video-room-left", () => {
+        updateMetrics(); // Add this handler to update metrics when someone leaves a room
+      });
+
       socket.on("message", (message) => {
         if (message.type === "system") {
           addActivity("System", message.content, <FiMessageCircle />);
@@ -170,6 +178,8 @@ const Dashboard = () => {
         socket.off("chat-deleted");
         socket.off("video-room-created");
         socket.off("video-room-ended");
+        socket.off("video-room-joined");
+        socket.off("video-room-left");
         socket.off("message");
         clearInterval(metricsInterval);
       };
