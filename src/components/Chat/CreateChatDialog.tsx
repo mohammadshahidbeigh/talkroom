@@ -219,32 +219,41 @@ const CreateChatDialog: React.FC<CreateChatDialogProps> = ({
               </InputLabel>
               <Select
                 multiple={type === "group"}
-                value={selectedParticipants}
-                onChange={(e) =>
-                  setSelectedParticipants(
-                    type === "direct"
-                      ? [e.target.value as string]
-                      : (e.target.value as string[])
-                  )
+                value={
+                  type === "group"
+                    ? selectedParticipants
+                    : selectedParticipants[0] || ""
                 }
+                onChange={(e) => {
+                  if (type === "group") {
+                    setSelectedParticipants(e.target.value as string[]);
+                  } else {
+                    setSelectedParticipants(
+                      e.target.value ? [e.target.value as string] : []
+                    );
+                  }
+                }}
                 renderValue={(selected) => (
                   <Box sx={{display: "flex", flexWrap: "wrap", gap: 0.5}}>
-                    {(Array.isArray(selected) ? selected : [selected]).map(
-                      (value) => {
-                        const user = users.find((u: User) => u.id === value);
-                        return (
-                          <Chip
-                            key={value}
-                            label={user?.username || value}
-                            onDelete={() =>
-                              setSelectedParticipants((prev) =>
-                                prev.filter((id) => id !== value)
-                              )
-                            }
-                          />
-                        );
-                      }
-                    )}
+                    {(Array.isArray(selected)
+                      ? selected
+                      : selected
+                      ? [selected]
+                      : []
+                    ).map((value) => {
+                      const user = users.find((u: User) => u.id === value);
+                      return (
+                        <Chip
+                          key={value}
+                          label={user?.username || value}
+                          onDelete={() =>
+                            setSelectedParticipants((prev) =>
+                              prev.filter((id) => id !== value)
+                            )
+                          }
+                        />
+                      );
+                    })}
                   </Box>
                 )}
               >
