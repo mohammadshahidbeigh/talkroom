@@ -111,11 +111,28 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
         refetch();
       });
 
+      // Add reconnection handling
+      socket.on("connect", () => {
+        console.log("Socket reconnected");
+        refetch(); // Refresh chat list on reconnection
+      });
+
+      socket.on("disconnect", () => {
+        console.log("Socket disconnected");
+        setNotification({
+          open: true,
+          message: "Lost connection to server. Reconnecting...",
+          severity: "warning",
+        });
+      });
+
       return () => {
         socket.off("message");
         socket.off("chat-updated");
         socket.off("participant-left");
         socket.off("message-deleted");
+        socket.off("connect");
+        socket.off("disconnect");
       };
     }
   }, [socket, refetch]);
@@ -180,7 +197,6 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
     if (contextMenu?.chat) {
       try {
         const result = await deleteChat(contextMenu.chat.id).unwrap();
-        // Type guard to check if result matches DeleteChatResponse
         const isDeleteChatResponse = (
           data: unknown
         ): data is DeleteChatResponse => {
@@ -198,6 +214,7 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
           throw new Error("Invalid response format");
         }
 
+        // Clear current chat if it's being deleted
         if (currentChat?.id === contextMenu.chat.id) {
           onChatSelect(null);
         }
@@ -208,6 +225,9 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
           userId: result.userId,
           username: result.username,
         });
+
+        // Refresh the chat list
+        await refetch();
 
         setNotification({
           open: true,

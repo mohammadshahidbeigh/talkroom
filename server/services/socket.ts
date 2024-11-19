@@ -5,6 +5,20 @@ export default (io: Server) => {
   io.on("connection", (socket) => {
     console.log(`User connected: ${socket.id}`);
 
+    socket.on("error", (error) => {
+      console.error("Socket error:", error);
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log(`User disconnected: ${socket.id}, reason: ${reason}`);
+      if (reason === "transport close" || reason === "transport error") {
+        // Instead of socket.connect(), use socket.connect event
+        socket.once("connect", () => {
+          console.log("Socket reconnected automatically");
+        });
+      }
+    });
+
     // Join a specific chat room
     socket.on("join-chat", (chatId: string) => {
       if (typeof chatId === "string") {
@@ -200,10 +214,6 @@ export default (io: Server) => {
       } catch (error) {
         console.error("Socket message deletion error:", error);
       }
-    });
-
-    socket.on("disconnect", () => {
-      console.log(`User disconnected: ${socket.id}`);
     });
   });
 };

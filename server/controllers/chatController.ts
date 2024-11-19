@@ -1,6 +1,7 @@
 import {Request, Response} from "express";
 import prisma from "../models";
 import {Prisma, Participant} from "@prisma/client";
+import {PrismaClient} from "@prisma/client";
 
 export const getChats = async (req: Request, res: Response) => {
   try {
@@ -239,53 +240,45 @@ export const deleteChat = async (req: Request, res: Response) => {
       return res.status(404).json({error: "Chat not found"});
     }
 
-    // Find and delete the participant record
-    const participant = await prisma.participant.findFirst({
+    // Get user info before deleting
+    const user = await prisma.user.findUnique({
+      where: {id: req.user!.id},
+      select: {username: true},
+    });
+
+    // Delete participant
+    await prisma.participant.deleteMany({
       where: {
         AND: [{chatId: id}, {userId: req.user!.id}],
       },
     });
 
-    if (participant) {
-      await prisma.participant.delete({
-        where: {
-          id: participant.id,
-        },
-      });
-
-      // Get user info for the system message
-      const user = await prisma.user.findUnique({
-        where: {id: req.user!.id},
-        select: {username: true},
-      });
-
-      // Return the username for the socket event
-      res.json({
-        success: true,
-        chatId: id,
-        userId: req.user!.id,
-        username: user?.username || "User",
-      });
-    }
-
-    // If this was the last participant, then delete the entire chat
-    if (chat.participants.length === 1) {
+    // If this was the last participant, delete the entire chat
+    if (chat.participants.length <= 1) {
       await prisma.$transaction(
-        async (tx: {
-          message: {deleteMany: (arg0: {where: {chatId: string}}) => any};
-          chat: {delete: (arg0: {where: {id: string}}) => any};
-        }) => {
-          // Delete all messages first
-          await tx.message.deleteMany({
-            where: {chatId: id},
-          });
-
-          // Delete the chat
-          await tx.chat.delete({
-            where: {id},
-          });
+        async (
+          tx: Omit<
+            PrismaClient,
+            "$connect" | "$disconnect" | "$on" | "$transaction" | "$use"
+          >
+        ) => {
+          await tx.message.deleteMany({where: {chatId: id}});
+          await tx.chat.delete({where: {id}});
         }
       );
+    }
+
+    // Send response before socket events
+    res.json({
+      success: true,
+      chatId: id,
+      userId: req.user!.id,
+      username: user?.username || "User",
+    });
+
+    // Emit socket events after response
+    if (req.io) {
+      req.io.emit("chat-deleted", {chatId: id});
     }
   } catch (error) {
     console.error("Delete chat error:", error);
