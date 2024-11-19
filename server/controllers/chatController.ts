@@ -255,17 +255,10 @@ export const deleteChat = async (req: Request, res: Response) => {
 
     // If this was the last participant, delete the entire chat
     if (chat.participants.length <= 1) {
-      await prisma.$transaction(
-        async (
-          tx: Omit<
-            PrismaClient,
-            "$connect" | "$disconnect" | "$on" | "$transaction" | "$use"
-          >
-        ) => {
-          await tx.message.deleteMany({where: {chatId: id}});
-          await tx.chat.delete({where: {id}});
-        }
-      );
+      await prisma.$transaction([
+        prisma.message.deleteMany({where: {chatId: id}}),
+        prisma.chat.delete({where: {id}}),
+      ]);
     }
 
     // Send response before socket events
