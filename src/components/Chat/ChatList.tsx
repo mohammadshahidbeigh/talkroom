@@ -16,8 +16,15 @@ import {
   Snackbar,
   Alert,
   Chip,
+  Button,
 } from "@mui/material";
-import {FiSearch, FiPlus, FiMoreVertical, FiTrash2} from "react-icons/fi";
+import {
+  FiSearch,
+  FiPlus,
+  FiMoreVertical,
+  FiTrash2,
+  FiUserX,
+} from "react-icons/fi";
 import {Chat, CreateChatPayload} from "../../types";
 import {useState, useEffect} from "react";
 import CreateChatDialog from "./CreateChatDialog";
@@ -28,6 +35,7 @@ import {
 } from "../../services/apiSlice";
 import useSocket from "../../hooks/useSocket"; // Use default import instead of named import
 import useAppSelector from "../../hooks/useAppSelector";
+import BlockedUsers from "../Settings/BlockedUsers";
 
 interface ChatListProps {
   currentChat: Chat | null;
@@ -53,6 +61,12 @@ interface ChatParticipant {
   user: {
     id: string;
   };
+}
+
+// Add interface for blocked users
+interface BlockedUser {
+  userId: string;
+  chatId: string;
 }
 
 const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
@@ -82,6 +96,15 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
 
   const [deleteChat] = useDeleteChatMutation();
   const [createChat] = useCreateChatMutation();
+
+  // Add state for blocked users
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>(() => {
+    const saved = localStorage.getItem("blockedUsers");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Add state for showing blocked users
+  const [showBlockedUsers, setShowBlockedUsers] = useState(false);
 
   useEffect(() => {
     setLocalChats(chats);
@@ -138,9 +161,57 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
     }
   }, [socket, refetch, currentChat, onChatSelect, currentUser]);
 
-  const filteredChats = localChats.filter((chat) =>
-    chat.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Add function to handle blocking users
+  const handleBlockUser = (chat: Chat) => {
+    const otherParticipant = chat.participants.find(
+      (p) => p.user.id !== currentUser?.id
+    );
+
+    if (otherParticipant) {
+      const newBlockedUser = {
+        userId: otherParticipant.user.id,
+        chatId: chat.id,
+      };
+
+      setBlockedUsers((prev) => {
+        const updated = [...prev, newBlockedUser];
+        localStorage.setItem("blockedUsers", JSON.stringify(updated));
+        return updated;
+      });
+
+      // Remove chat from view
+      setLocalChats((prev) => prev.filter((c) => c.id !== chat.id));
+
+      if (currentChat?.id === chat.id) {
+        onChatSelect(null);
+      }
+
+      setNotification({
+        open: true,
+        message: `Muted ${otherParticipant.user.username}`,
+        severity: "success",
+      });
+    }
+    handleCloseContextMenu();
+  };
+
+  // Add function to check if a chat is blocked
+  const isChatBlocked = (chat: Chat) => {
+    if (chat.type === "direct") {
+      const otherParticipant = chat.participants.find(
+        (p) => p.user.id !== currentUser?.id
+      );
+      return blockedUsers.some((bu) => bu.userId === otherParticipant?.user.id);
+    }
+    return false;
+  };
+
+  // Filter out blocked chats from display
+  const filteredChats = localChats
+    .filter((chat) => !isChatBlocked(chat))
+    .filter((chat) =>
+      chat.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   const getFirstParticipantAvatar = (chat: Chat) => {
     const firstParticipant = chat.participants?.[0]?.user;
@@ -302,6 +373,24 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
     return null;
   };
 
+  // Add unblock function
+  const handleUnblockUser = (userId: string) => {
+    setBlockedUsers((prev) => {
+      const updated = prev.filter((bu) => bu.userId !== userId);
+      localStorage.setItem("blockedUsers", JSON.stringify(updated));
+      return updated;
+    });
+
+    // Refresh chat list to show unblocked chats
+    refetch();
+
+    setNotification({
+      open: true,
+      message: "User unmuted successfully",
+      severity: "success",
+    });
+  };
+
   return (
     <Box
       sx={{
@@ -343,7 +432,12 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
         </IconButton>
       </Box>
 
-      {isLoading ? (
+      {showBlockedUsers ? (
+        <BlockedUsers
+          blockedUsers={blockedUsers}
+          onUnblock={handleUnblockUser}
+        />
+      ) : isLoading ? (
         <Box sx={{display: "flex", justifyContent: "center", p: 2}}>
           <CircularProgress />
         </Box>
@@ -408,6 +502,26 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
         </List>
       )}
 
+      <Box
+        sx={{
+          p: 2,
+          borderTop: 1,
+          borderColor: "divider",
+          bgcolor: "background.paper", // Add background color
+          mt: "auto", // Push to bottom
+        }}
+      >
+        <Button
+          fullWidth
+          onClick={() => setShowBlockedUsers(!showBlockedUsers)}
+          variant="outlined"
+          startIcon={<FiUserX />}
+          color={showBlockedUsers ? "primary" : "inherit"}
+        >
+          {showBlockedUsers ? "Show Chats" : "Muted Users"}
+        </Button>
+      </Box>
+
       <Menu
         open={Boolean(contextMenu)}
         onClose={handleCloseContextMenu}
@@ -422,6 +536,15 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
           <FiTrash2 style={{marginRight: 8}} />
           Delete Chat
         </MenuItem>
+        {contextMenu?.chat?.type === "direct" && (
+          <MenuItem
+            onClick={() => handleBlockUser(contextMenu.chat!)}
+            sx={{color: "error.main"}}
+          >
+            <FiUserX style={{marginRight: 8}} />
+            Mute User
+          </MenuItem>
+        )}
       </Menu>
 
       <CreateChatDialog
