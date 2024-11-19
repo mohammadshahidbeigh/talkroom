@@ -82,7 +82,15 @@ const Login = () => {
       const responseData = await response.json();
 
       if (!response.ok) {
-        throw new Error(responseData.message || "Login failed");
+        let errorMessage = "Login failed";
+        if (response.status === 401) {
+          errorMessage = "Invalid email or password";
+        } else if (response.status === 404) {
+          errorMessage = "User not found";
+        } else if (response.status === 500) {
+          errorMessage = "Server error. Please try again later";
+        }
+        throw new Error(errorMessage);
       }
 
       const {user, token} = responseData;
@@ -96,7 +104,7 @@ const Login = () => {
       dispatch(login({user, token}));
       setNotification({
         open: true,
-        message: "Login successful!",
+        message: `Welcome back, ${user.username}!`,
         severity: "success",
       });
 

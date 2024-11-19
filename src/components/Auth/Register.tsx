@@ -84,32 +84,37 @@ const Register = () => {
       });
       const responseData = await response.json();
 
-      if (response.ok) {
-        // Store JWT token and user data
-        localStorage.setItem("token", responseData.token);
-        dispatch(login({user: responseData.user, token: responseData.token}));
-        setNotification({
-          open: true,
-          message: "Registration successful! Redirecting to dashboard...",
-          severity: "success",
-        });
-        setTimeout(() => {
-          navigate("/dashboard");
-        }, 1500);
-      } else {
-        // Handle registration error
-        setNotification({
-          open: true,
-          message:
-            responseData.message || "Registration failed. Please try again.",
-          severity: "error",
-        });
+      if (!response.ok) {
+        let errorMessage = "Registration failed";
+        if (response.status === 409) {
+          errorMessage = "Email or username already exists";
+        } else if (response.status === 400) {
+          errorMessage = responseData.message || "Invalid registration data";
+        } else if (response.status === 500) {
+          errorMessage = "Server error. Please try again later";
+        }
+        throw new Error(errorMessage);
       }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
+      // Store JWT token and user data
+      localStorage.setItem("token", responseData.token);
+      dispatch(login({user: responseData.user, token: responseData.token}));
+      setNotification({
+        open: true,
+        message: `Welcome to TalkRoom, ${responseData.user.username}!`,
+        severity: "success",
+      });
+
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1500);
     } catch (error) {
       setNotification({
         open: true,
-        message: "Network error. Please check your connection and try again.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Network error. Please check your connection and try again.",
         severity: "error",
       });
     } finally {

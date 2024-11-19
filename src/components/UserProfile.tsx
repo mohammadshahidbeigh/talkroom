@@ -86,13 +86,21 @@ const UserProfile: React.FC<UserProfileProps> = () => {
 
         // Validate file type
         if (!file.type.startsWith("image/")) {
-          alert("Please select an image file");
+          setNotification({
+            open: true,
+            message: "Please select an image file",
+            severity: "error",
+          });
           return;
         }
 
         // Validate file size (5MB max)
         if (file.size > 5 * 1024 * 1024) {
-          alert("File size should be less than 5MB");
+          setNotification({
+            open: true,
+            message: "File size should be less than 5MB",
+            severity: "error",
+          });
           return;
         }
 
@@ -132,10 +140,18 @@ const UserProfile: React.FC<UserProfileProps> = () => {
           avatarElement.setAttribute("src", avatarUrl);
         }
 
-        alert("Avatar updated successfully!");
+        setNotification({
+          open: true,
+          message: "Avatar updated successfully!",
+          severity: "success",
+        });
       } catch (error) {
         console.error("Error uploading avatar:", error);
-        alert("Failed to upload avatar. Please try again.");
+        setNotification({
+          open: true,
+          message: "Failed to upload avatar. Please try again.",
+          severity: "error",
+        });
       } finally {
         setIsLoading(false);
         // Reset file input
@@ -157,7 +173,11 @@ const UserProfile: React.FC<UserProfileProps> = () => {
       setIsLoading(true);
 
       if (!profileData.username.trim() || !profileData.fullName.trim()) {
-        alert("Username and Full Name are required");
+        setNotification({
+          open: true,
+          message: "Username and Full Name are required",
+          severity: "error",
+        });
         return;
       }
 
@@ -168,10 +188,18 @@ const UserProfile: React.FC<UserProfileProps> = () => {
       }).unwrap();
 
       dispatch(updateAuthUser(updatedUser));
-      alert("Profile updated successfully!");
+      setNotification({
+        open: true,
+        message: "Profile updated successfully!",
+        severity: "success",
+      });
     } catch (error) {
       console.error("Error saving changes:", error);
-      alert("Failed to update profile. Please try again.");
+      setNotification({
+        open: true,
+        message: "Failed to update profile. Please try again.",
+        severity: "error",
+      });
     } finally {
       setIsLoading(false);
     }
