@@ -60,6 +60,25 @@ interface ChatParticipant {
   };
 }
 
+// Add this constant for max activities to store
+const MAX_ACTIVITIES = 10;
+
+// Move getActivityIcon outside of the component
+const getActivityIcon = (type: string): JSX.Element => {
+  switch (type) {
+    case "New User":
+      return <FiUser />;
+    case "Direct Chat":
+    case "Group Chat":
+    case "System":
+      return <FiMessageCircle />;
+    case "Video Call":
+      return <FiVideo />;
+    default:
+      return <FiMessageCircle />;
+  }
+};
+
 const Dashboard = () => {
   const user = useAppSelector((state) => state.auth.user);
   const socket = useSocket();
@@ -73,7 +92,23 @@ const Dashboard = () => {
   });
 
   // State for recent activities
-  const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
+  const [recentActivities, setRecentActivities] = useState<Activity[]>(() => {
+    const saved = localStorage.getItem("recentActivities");
+    if (saved) {
+      try {
+        // Parse the saved activities, but recreate the icon elements
+        const parsed = JSON.parse(saved);
+        return parsed.map((activity: any) => ({
+          ...activity,
+          icon: getActivityIcon(activity.type),
+        }));
+      } catch (e) {
+        console.error("Error parsing saved activities:", e);
+        return [];
+      }
+    }
+    return [];
+  });
 
   // Memoize the updateMetrics function
   const updateMetrics = useCallback(async () => {
@@ -200,7 +235,18 @@ const Dashboard = () => {
         timestamp: new Date().toISOString(),
         icon,
       };
-      return [newActivity, ...prev.slice(0, 4)];
+
+      // Create new array with new activity at the start
+      const updatedActivities = [
+        newActivity,
+        ...prev.slice(0, MAX_ACTIVITIES - 1),
+      ];
+
+      // Save to localStorage (without the icon JSX element)
+      const forStorage = updatedActivities.map(({icon, ...rest}) => rest);
+      localStorage.setItem("recentActivities", JSON.stringify(forStorage));
+
+      return updatedActivities;
     });
   };
 
@@ -208,6 +254,30 @@ const Dashboard = () => {
   useEffect(() => {
     updateMetrics();
   }, [updateMetrics]);
+
+  // Add cleanup function for old activities (optional)
+  useEffect(() => {
+    const cleanupOldActivities = () => {
+      const ONE_DAY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+      setRecentActivities((prev) => {
+        const now = new Date().getTime();
+        const filtered = prev.filter((activity) => {
+          const activityTime = new Date(activity.timestamp).getTime();
+          return now - activityTime < ONE_DAY;
+        });
+
+        // Save filtered activities to localStorage
+        const forStorage = filtered.map(({icon, ...rest}) => rest);
+        localStorage.setItem("recentActivities", JSON.stringify(forStorage));
+
+        return filtered;
+      });
+    };
+
+    // Clean up old activities every hour
+    const cleanup = setInterval(cleanupOldActivities, 60 * 60 * 1000);
+    return () => clearInterval(cleanup);
+  }, []);
 
   return (
     <Box
