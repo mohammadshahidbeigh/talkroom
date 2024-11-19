@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import prisma from "../models";
 import config from "../config/default";
+import {setUserSession, getUserSession} from "../services/redis";
 
 // Register
 export const register = async (req: Request, res: Response) => {
@@ -57,6 +58,11 @@ export const login = async (req: Request, res: Response) => {
   const token = jwt.sign({userId: user.id}, config.jwtSecret as string);
 
   const {...userWithoutPassword} = user;
+  await setUserSession(user.id, {
+    id: user.id,
+    email: user.email,
+    lastLogin: new Date(),
+  });
   res.json({token, user: userWithoutPassword});
 };
 

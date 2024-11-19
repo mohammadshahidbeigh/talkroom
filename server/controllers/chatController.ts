@@ -2,6 +2,7 @@ import {Request, Response} from "express";
 import prisma from "../models";
 import {Prisma, Participant} from "@prisma/client";
 import {PrismaClient} from "@prisma/client";
+import {setChatCache, getChatCache} from "../services/redis";
 
 export const getChats = async (req: Request, res: Response) => {
   try {
@@ -276,5 +277,30 @@ export const deleteChat = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Delete chat error:", error);
     res.status(500).json({error: "Failed to delete chat"});
+  }
+};
+
+export const getMessages = async (req: Request, res: Response) => {
+  try {
+    const {chatId} = req.params;
+
+    // Try to get messages from cache first
+    const cachedMessages = await getChatCache(chatId);
+    if (cachedMessages) {
+      return res.json(cachedMessages);
+    }
+
+    // If not in cache, get from database
+    const messages = await prisma.message.findMany({
+      where: {chatId},
+      // ... your existing query
+    });
+
+    // Store in cache for future requests
+    await setChatCache(chatId, messages);
+
+    res.json(messages);
+  } catch (error) {
+    // Error handling...
   }
 };

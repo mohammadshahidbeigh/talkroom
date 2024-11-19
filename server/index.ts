@@ -12,6 +12,7 @@ import {initializeWebRTC} from "./services/webrtc";
 import {PrismaClient} from "@prisma/client";
 import cors from "cors";
 import metricsRoutes from "./routes/metrics";
+import {rateLimiter} from "./middleware/rateLimiter";
 
 const app = express();
 const server = http.createServer(app);
@@ -51,6 +52,9 @@ app.use((req, res, next) => {
   req.io = io;
   next();
 });
+
+// Add rate limiting before route declarations
+app.use(rateLimiter);
 
 // Register routes
 app.use("/auth", authRoutes);
