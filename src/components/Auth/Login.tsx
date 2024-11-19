@@ -8,8 +8,6 @@ import {
   InputAdornment,
   Card,
   CardContent,
-  Checkbox,
-  FormControlLabel,
   IconButton,
   Snackbar,
   Alert,
@@ -297,22 +295,11 @@ const Login = () => {
             <Box
               sx={{
                 display: "flex",
-                justifyContent: "space-between",
+                justifyContent: "flex-end",
                 width: "100%",
                 marginY: 2,
               }}
             >
-              <Controller
-                name="rememberMe"
-                control={control}
-                render={({field}) => (
-                  <FormControlLabel
-                    control={<Checkbox {...field} />}
-                    label="Remember me"
-                    sx={{fontFamily: "Inter, sans-serif", fontSize: "14px"}}
-                  />
-                )}
-              />
               <Link
                 to="/forgot-password"
                 style={{
@@ -320,6 +307,8 @@ const Login = () => {
                   textDecoration: "none",
                   fontFamily: "Inter, sans-serif",
                   fontSize: "14px",
+                  pointerEvents: "none",
+                  opacity: 0.5,
                 }}
               >
                 Forgot password?
