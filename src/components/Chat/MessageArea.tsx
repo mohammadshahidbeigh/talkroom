@@ -638,7 +638,9 @@ const MessageArea: React.FC<MessageAreaProps> = ({
             justifyContent: "space-between",
           }}
         >
-          <Typography variant="h6">{currentChat.name || "Chat"}</Typography>
+          <Typography variant="h6">
+            {currentChat.name || "Ongoing Chat"}
+          </Typography>
           <Box
             sx={{
               display: "flex",
@@ -660,9 +662,13 @@ const MessageArea: React.FC<MessageAreaProps> = ({
             </Typography>
           </Box>
         </Box>
-        <Typography variant="body2" color="text.secondary">
-          {participants.map((p) => p.username).join(", ")}
-        </Typography>
+      <Typography variant="body2" color="text.secondary">
+        {currentChat.type === "direct"
+          ? participants.find(p => p.id !== currentUser?.id)?.username || ""
+          : participants
+              .map(p => p.id === currentUser?.id ? "You" : p.username)
+              .join(", ")}
+      </Typography>
       </Box>
 
       {/* Messages Area */}
