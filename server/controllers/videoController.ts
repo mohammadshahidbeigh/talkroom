@@ -32,6 +32,7 @@ export const createVideoRoom = async (req: Request, res: Response) => {
         },
       },
     });
+    req.io?.emit("video-room-created", {creator: req.user?.username});
     res.json(videoRoom);
   } catch (error) {
     console.error("Create video room error:", error);
@@ -153,6 +154,7 @@ export const leaveVideoRoom = async (req: Request, res: Response) => {
         where: {id: roomId},
         data: {endedAt: new Date()},
       });
+      req.io?.emit("video-room-ended", {roomId});
     }
 
     res.status(200).json({message: "Left room successfully"});

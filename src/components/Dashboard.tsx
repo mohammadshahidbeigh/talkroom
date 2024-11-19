@@ -17,30 +17,187 @@ import {
 import {FiUser, FiMessageCircle, FiVideo, FiTrendingUp} from "react-icons/fi";
 import {Header, Sidebar} from "./Layout";
 import useAppSelector from "../hooks/useAppSelector";
+import {useGetChatsQuery} from "../services/apiSlice";
+import {useEffect, useState, useCallback} from "react";
+import useSocket from "../hooks/useSocket";
+
+const formatTimestamp = (timestamp: string) => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+
+  // Less than a minute
+  if (diff < 60000) {
+    return "Just now";
+  }
+  // Less than an hour
+  if (diff < 3600000) {
+    const minutes = Math.floor(diff / 60000);
+    return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
+  }
+  // Less than a day
+  if (diff < 86400000) {
+    const hours = Math.floor(diff / 3600000);
+    return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+  }
+  // Otherwise show date
+  return date.toLocaleDateString();
+};
+
+interface Activity {
+  id: string;
+  type: string;
+  description: string;
+  timestamp: string;
+  icon: JSX.Element;
+}
+
+// Add interface for chat participant
+interface ChatParticipant {
+  user: {
+    id: string;
+    username: string;
+  };
+}
 
 const Dashboard = () => {
   const user = useAppSelector((state) => state.auth.user);
+  const socket = useSocket();
+  const {data: chats = [], refetch} = useGetChatsQuery();
 
-  const recentActivities = [
-    {
-      type: "New User",
-      description: "John Doe joined the platform",
-      time: "2 minutes ago",
-      icon: <FiUser />,
-    },
-    {
-      type: "Video Call",
-      description: "Team meeting completed",
-      time: "1 hour ago",
-      icon: <FiVideo />,
-    },
-    {
-      type: "Chat",
-      description: "New group chat created",
-      time: "3 hours ago",
-      icon: <FiMessageCircle />,
-    },
-  ];
+  // State for dashboard metrics
+  const [metrics, setMetrics] = useState({
+    totalUsers: 0,
+    activeChats: 0,
+    videoRooms: 0,
+  });
+
+  // State for recent activities
+  const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
+
+  // Memoize the updateMetrics function
+  const updateMetrics = useCallback(async () => {
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      if (!token) {
+        console.error("No auth token found");
+        return;
+      }
+
+      const response = await fetch("http://localhost:5000/metrics", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setMetrics(data);
+    } catch (error) {
+      console.error("Failed to fetch metrics:", error);
+      setMetrics({
+        totalUsers: 0,
+        activeChats: 0,
+        videoRooms: 0,
+      });
+    }
+  }, []);
+
+  // Listen for socket events to update metrics and activities
+  useEffect(() => {
+    if (socket && user) {
+      // Initial fetch
+      updateMetrics();
+
+      socket.on("user-joined", ({username}) => {
+        addActivity("New User", `${username} joined the platform`, <FiUser />);
+        updateMetrics(); // Refresh metrics when new user joins
+      });
+
+      socket.on("chat-created", (chat) => {
+        const chatType = chat.type === "direct" ? "Direct Chat" : "Group Chat";
+        const description =
+          chat.type === "direct"
+            ? `New chat created with ${
+                chat.participants.find(
+                  (p: ChatParticipant) => p.user.id !== user?.id
+                )?.user.username
+              }`
+            : `New group "${chat.name}" created`;
+
+        addActivity(chatType, description, <FiMessageCircle />);
+        updateMetrics(); // Refresh metrics when chat is created
+        refetch(); // Refresh chat list
+      });
+
+      socket.on("chat-deleted", () => {
+        updateMetrics(); // Refresh metrics when chat is deleted
+        refetch(); // Refresh chat list
+      });
+
+      socket.on("video-room-created", ({creator}) => {
+        addActivity(
+          "Video Call",
+          `${creator} started a video call`,
+          <FiVideo />
+        );
+        updateMetrics(); // Refresh metrics when video room is created
+      });
+
+      socket.on("video-room-ended", () => {
+        updateMetrics(); // Refresh metrics when video room ends
+      });
+
+      socket.on("message", (message) => {
+        if (message.type === "system") {
+          addActivity("System", message.content, <FiMessageCircle />);
+          updateMetrics(); // Refresh metrics for system events
+        }
+      });
+
+      // Set up polling for metrics
+      const metricsInterval = setInterval(updateMetrics, 30000); // Update every 30 seconds
+
+      return () => {
+        socket.off("user-joined");
+        socket.off("chat-created");
+        socket.off("chat-deleted");
+        socket.off("video-room-created");
+        socket.off("video-room-ended");
+        socket.off("message");
+        clearInterval(metricsInterval);
+      };
+    }
+  }, [socket, user, updateMetrics, refetch]);
+
+  // Function to add new activity
+  const addActivity = (
+    type: string,
+    description: string,
+    icon: JSX.Element
+  ) => {
+    setRecentActivities((prev) => {
+      const newActivity = {
+        id: Date.now().toString(),
+        type,
+        description,
+        timestamp: new Date().toISOString(),
+        icon,
+      };
+      return [newActivity, ...prev.slice(0, 4)];
+    });
+  };
+
+  // Initial metrics fetch
+  useEffect(() => {
+    updateMetrics();
+  }, [updateMetrics]);
 
   return (
     <Box
@@ -91,22 +248,24 @@ const Dashboard = () => {
               {
                 title: "Total Users",
                 icon: <FiUser />,
-                value: "1,234",
-                change: "+20.1%",
+                value: metrics.totalUsers.toString(),
+                change: "+5%",
                 progress: 85,
               },
               {
                 title: "Active Chats",
                 icon: <FiMessageCircle />,
-                value: "42",
-                change: "+15%",
+                value: chats.length.toString(),
+                change: `+${((chats.length / metrics.totalUsers) * 100).toFixed(
+                  1
+                )}%`,
                 progress: 65,
               },
               {
-                title: "Video Calls",
+                title: "Video Rooms",
                 icon: <FiVideo />,
-                value: "8",
-                change: "+7%",
+                value: metrics.videoRooms.toString(),
+                change: "+10%",
                 progress: 45,
               },
             ].map((item) => (
@@ -185,9 +344,9 @@ const Dashboard = () => {
             />
             <CardContent>
               <List>
-                {recentActivities.map((activity, index) => (
-                  <>
-                    <ListItem key={index}>
+                {recentActivities.map((activity) => (
+                  <Box key={activity.id}>
+                    <ListItem>
                       <ListItemAvatar>
                         <Avatar sx={{bgcolor: "primary.main"}}>
                           {activity.icon}
@@ -203,12 +362,23 @@ const Dashboard = () => {
                         }}
                       />
                       <Typography variant="caption" color="text.secondary">
-                        {activity.time}
+                        {formatTimestamp(activity.timestamp)}
                       </Typography>
                     </ListItem>
-                    {index < recentActivities.length - 1 && <Divider />}
-                  </>
+                    {activity !==
+                      recentActivities[recentActivities.length - 1] && (
+                      <Divider />
+                    )}
+                  </Box>
                 ))}
+                {recentActivities.length === 0 && (
+                  <ListItem>
+                    <ListItemText
+                      primary="No recent activities"
+                      sx={{color: "text.secondary"}}
+                    />
+                  </ListItem>
+                )}
               </List>
             </CardContent>
           </Card>

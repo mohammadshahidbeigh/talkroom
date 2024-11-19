@@ -11,6 +11,7 @@ import initializeSocket from "./services/socket";
 import {initializeWebRTC} from "./services/webrtc";
 import {PrismaClient} from "@prisma/client";
 import cors from "cors";
+import metricsRoutes from "./routes/metrics";
 
 const app = express();
 const server = http.createServer(app);
@@ -58,6 +59,7 @@ app.use("/user", userRoutes);
 app.use("/video", videoRoutes);
 app.use("/message", messageRoutes);
 app.use("/", uploadRoutes);
+app.use("/metrics", metricsRoutes);
 
 // Error handling middleware for JSON parsing errors
 const jsonErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
