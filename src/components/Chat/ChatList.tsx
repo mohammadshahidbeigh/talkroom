@@ -47,6 +47,14 @@ interface DeleteChatResponse {
   username: string;
 }
 
+// Add interface for chat participant
+interface ChatParticipant {
+  userId: string;
+  user: {
+    id: string;
+  };
+}
+
 const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -80,24 +88,41 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
   }, [chats]);
 
   useEffect(() => {
-    if (socket) {
-      // Handle new messages
-      socket.on("message", () => {
-        console.log("Received new message, refreshing chats");
-        refetch(); // Refresh chat list to update last messages
+    if (socket && currentUser) {
+      // Authenticate socket with user ID
+      socket.emit("authenticate", currentUser.id);
+
+      socket.on("chat-created", (newChat) => {
+        // Only add chat if user is a participant
+        if (
+          newChat.participants.some(
+            (p: ChatParticipant) => p.userId === currentUser.id
+          )
+        ) {
+          setLocalChats((prevChats) => {
+            if (prevChats.some((chat) => chat.id === newChat.id)) {
+              return prevChats;
+            }
+            return [...prevChats, newChat];
+          });
+        }
       });
 
       // Handle chat updates
       socket.on("chat-updated", () => {
-        console.log("Chat updated, refreshing list");
         refetch();
       });
 
-      // Handle participant leaving - removed notification sound
-      socket.on("participant-left", ({username}) => {
-        console.log(`${username} left chat, refreshing list`);
-        refetch();
-        // Show only visual notification
+      // Handle participant leaving
+      socket.on("participant-left", ({chatId, username}) => {
+        setLocalChats((prevChats) =>
+          prevChats.filter((chat) => chat.id !== chatId)
+        );
+
+        if (currentChat?.id === chatId) {
+          onChatSelect(null);
+        }
+
         setNotification({
           open: true,
           message: `${username} left the chat`,
@@ -105,37 +130,13 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
         });
       });
 
-      // Handle message deletion
-      socket.on("message-deleted", () => {
-        console.log("Message deleted, refreshing list");
-        refetch();
-      });
-
-      // Add reconnection handling
-      socket.on("connect", () => {
-        console.log("Socket reconnected");
-        refetch(); // Refresh chat list on reconnection
-      });
-
-      socket.on("disconnect", () => {
-        console.log("Socket disconnected");
-        setNotification({
-          open: true,
-          message: "Lost connection to server. Reconnecting...",
-          severity: "warning",
-        });
-      });
-
       return () => {
-        socket.off("message");
+        socket.off("chat-created");
         socket.off("chat-updated");
         socket.off("participant-left");
-        socket.off("message-deleted");
-        socket.off("connect");
-        socket.off("disconnect");
       };
     }
-  }, [socket, refetch]);
+  }, [socket, refetch, currentChat, onChatSelect, currentUser]);
 
   const filteredChats = localChats.filter((chat) =>
     chat.name?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -246,74 +247,21 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
     handleCloseContextMenu();
   };
 
-  const checkChatExists = (participants: string[], type: string): boolean => {
-    return chats.some((chat) => {
-      if (type === "direct" && chat.type === "direct") {
-        // For direct chats, check if the same two users are involved
-        const chatParticipantIds = chat.participants
-          .map((p) => p.userId)
-          .sort();
-        const newParticipantIds = [...participants].sort();
-        return (
-          JSON.stringify(chatParticipantIds) ===
-          JSON.stringify(newParticipantIds)
-        );
-      } else if (type === "group" && chat.type === "group") {
-        // For group chats, check if the same participants and name exist
-        const chatParticipantIds = chat.participants
-          .map((p) => p.userId)
-          .sort();
-        const newParticipantIds = [...participants].sort();
-        return (
-          JSON.stringify(chatParticipantIds) ===
-          JSON.stringify(newParticipantIds)
-        );
-      }
-      return false;
-    });
-  };
-
   const handleCreateChat = async (data: CreateChatPayload) => {
     try {
-      // Check if chat already exists
-      if (checkChatExists(data.participants, data.type)) {
-        setNotification({
-          open: true,
-          message:
-            data.type === "direct"
-              ? "Opening existing chat..."
-              : "Opening existing group chat...",
-          severity: "info",
-        });
-
-        // Find the existing chat
-        const existingChat = chats.find((chat) => {
-          if (data.type === "direct" && chat.type === "direct") {
-            const chatParticipantIds = chat.participants
-              .map((p) => p.userId)
-              .sort();
-            const newParticipantIds = [...data.participants].sort();
-            return (
-              JSON.stringify(chatParticipantIds) ===
-              JSON.stringify(newParticipantIds)
-            );
-          }
-          return false;
-        });
-
-        if (existingChat) {
-          onChatSelect(existingChat);
-          setCreateDialogOpen(false);
-        }
-        return;
-      }
-
       const response = await createChat(data).unwrap();
+
+      // Update local state immediately
+      setLocalChats((prevChats) => [...prevChats, response]);
+
+      // Select the new chat
       onChatSelect(response);
       setCreateDialogOpen(false);
+
+      // Emit socket event
+      socket?.emit("chat-created", response);
     } catch (error) {
-      // Just log the error without showing notification
-      console.error("Error creating chat:", error);
+      // Handle errors silently
     }
   };
 

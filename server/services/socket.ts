@@ -1,6 +1,16 @@
 import {Server} from "socket.io";
 import prisma from "../models";
 
+// Add interface at the top
+interface ChatParticipant {
+  userId: string;
+}
+
+interface CreatedChat {
+  id: string;
+  participants: ChatParticipant[];
+}
+
 export default (io: Server) => {
   io.on("connection", (socket) => {
     console.log(`User connected: ${socket.id}`);
@@ -214,6 +224,54 @@ export default (io: Server) => {
       } catch (error) {
         console.error("Socket message deletion error:", error);
       }
+    });
+
+    // Update the chat-created handler
+    socket.on("chat-created", async (chat: CreatedChat) => {
+      try {
+        // Get the full chat details with user info
+        const fullChat = await prisma.chat.findUnique({
+          where: {id: chat.id},
+          include: {
+            participants: {
+              include: {
+                user: true,
+              },
+            },
+            messages: {
+              include: {
+                sender: true,
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+              take: 1,
+            },
+          },
+        });
+
+        if (fullChat) {
+          // Only emit to participants of this chat
+          fullChat.participants.forEach((participant) => {
+            // Find socket(s) for this user and emit to them
+            const userSockets = Array.from(io.sockets.sockets.values()).filter(
+              (socket) => socket.data.userId === participant.userId
+            );
+
+            userSockets.forEach((userSocket) => {
+              userSocket.emit("chat-created", fullChat);
+            });
+          });
+        }
+      } catch (error) {
+        console.error("Error handling chat creation:", error);
+      }
+    });
+
+    // Add this connection handler at the start of the socket connection
+    socket.on("authenticate", (userId: string) => {
+      socket.data.userId = userId;
+      console.log(`Socket ${socket.id} authenticated for user ${userId}`);
     });
   });
 };

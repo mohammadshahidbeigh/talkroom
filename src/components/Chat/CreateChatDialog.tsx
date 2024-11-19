@@ -117,21 +117,20 @@ const CreateChatDialog: React.FC<CreateChatDialogProps> = ({
         participants: selectedParticipants,
       };
 
-      // Create chat
-      await createChat(chatData).unwrap();
+      const response = await createChat(chatData).unwrap();
 
-      setNotification({
-        open: true,
-        message: `${
-          type === "direct" ? "Chat" : "Group chat"
-        } created successfully`,
-        severity: "success",
-      });
+      // Convert response to CreateChatPayload format
+      const chatPayload: CreateChatPayload = {
+        name: response.name || "", // Ensure name is never undefined
+        type: response.type,
+        participants: response.participants.map((p) => p.userId),
+      };
 
-      await onChatCreated(chatData);
+      // Call onChatCreated with the converted payload
+      await onChatCreated(chatPayload);
+
+      // Close dialog and reset form
       onClose();
-
-      // Reset form
       setName("");
       setType("direct");
       setSelectedParticipants([]);
