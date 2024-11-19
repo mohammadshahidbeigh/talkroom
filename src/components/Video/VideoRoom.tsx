@@ -18,7 +18,15 @@ import {
   peerConnections,
 } from "../../services/webrtc";
 import VideoStream from "./VideoStream";
-import {Box, IconButton, Paper, Badge, Drawer} from "@mui/material";
+import {
+  Box,
+  IconButton,
+  Paper,
+  Badge,
+  Drawer,
+  useTheme,
+  useMediaQuery,
+} from "@mui/material";
 import {
   FiMic,
   FiMicOff,
@@ -54,16 +62,26 @@ interface PeerConnectionWithStream {
   stream: MediaStream;
 }
 
-const getOptimalGridSize = (count: number) => {
-  if (count <= 1) return {cols: 1, rows: 1};
-  if (count <= 2) return {cols: 2, rows: 1};
-  if (count <= 4) return {cols: 2, rows: 2};
-  if (count <= 6) return {cols: 3, rows: 2};
-  if (count <= 9) return {cols: 3, rows: 3};
-  return {
-    cols: 4,
-    rows: Math.ceil(count / 4),
-  };
+const getOptimalGridSize = (count: number, isMobile: boolean) => {
+  if (isMobile) {
+    if (count <= 1) return {cols: 1, rows: 1};
+    if (count <= 2) return {cols: 1, rows: 2};
+    if (count <= 4) return {cols: 2, rows: 2};
+    return {
+      cols: 2,
+      rows: Math.ceil(count / 2),
+    };
+  } else {
+    if (count <= 1) return {cols: 1, rows: 1};
+    if (count <= 2) return {cols: 2, rows: 1};
+    if (count <= 4) return {cols: 2, rows: 2};
+    if (count <= 6) return {cols: 3, rows: 2};
+    if (count <= 9) return {cols: 3, rows: 3};
+    return {
+      cols: 4,
+      rows: Math.ceil(count / 4),
+    };
+  }
 };
 
 const VideoRoom: React.FC = () => {
@@ -92,6 +110,8 @@ const VideoRoom: React.FC = () => {
   const [pinnedParticipantId, setPinnedParticipantId] = useState<string | null>(
     null
   );
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   useEffect(() => {
     if (roomParticipants) {
@@ -379,7 +399,7 @@ const VideoRoom: React.FC = () => {
     return (
       <Box
         sx={{
-          marginLeft: "240px", // Account for sidebar
+          marginLeft: {xs: 0, md: "240px"}, // Account for sidebar
           minHeight: "100vh",
           bgcolor: "background.default",
         }}
@@ -395,7 +415,7 @@ const VideoRoom: React.FC = () => {
   return (
     <Box
       sx={{
-        marginLeft: "240px", // Account for sidebar
+        marginLeft: {xs: 0, md: "240px"}, // Account for sidebar
         height: "100vh",
         display: "flex",
         flexDirection: "column",
@@ -447,7 +467,7 @@ const VideoRoom: React.FC = () => {
             <Box
               sx={{
                 display: "grid",
-                gridTemplateColumns: "3fr 1fr",
+                gridTemplateColumns: {xs: "1fr", md: "3fr 1fr"},
                 gridTemplateRows: "repeat(auto-fill, minmax(200px, 1fr))",
                 gap: 2,
                 width: "100%",
@@ -457,7 +477,7 @@ const VideoRoom: React.FC = () => {
               {/* Pinned Stream */}
               <Box
                 sx={{
-                  gridColumn: "1 / 2",
+                  gridColumn: {xs: "1 / -1", md: "1 / 2"},
                   gridRow: "1 / -1",
                   height: "100%",
                   aspectRatio: "16/9",
@@ -490,7 +510,7 @@ const VideoRoom: React.FC = () => {
               {/* Other Streams */}
               <Box
                 sx={{
-                  gridColumn: "2 / 3",
+                  gridColumn: {xs: "1 / -1", md: "2 / 3"},
                   gridRow: "1 / -1",
                   display: "flex",
                   flexDirection: "column",
@@ -544,13 +564,15 @@ const VideoRoom: React.FC = () => {
               sx={{
                 display: "grid",
                 gridTemplateColumns: `repeat(${
-                  getOptimalGridSize(totalParticipants).cols
+                  getOptimalGridSize(totalParticipants, isMobile).cols
                 }, 1fr)`,
                 gridAutoRows: "1fr",
-                gap: 2,
+                gap: {xs: 1, sm: 2},
                 width: "100%",
                 height: "100%",
                 aspectRatio: totalParticipants <= 1 ? "16/9" : "auto",
+                px: {xs: 1, sm: 3},
+                py: {xs: 2, sm: 3},
               }}
             >
               {/* Local Stream */}
@@ -626,9 +648,9 @@ const VideoRoom: React.FC = () => {
         sx={{
           position: "fixed",
           bottom: 0,
-          left: "240px", // Account for sidebar
+          left: {xs: 0, md: "240px"}, // Account for sidebar
           right: 0,
-          p: 2,
+          p: {xs: 1, sm: 2},
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
@@ -638,11 +660,11 @@ const VideoRoom: React.FC = () => {
         <Paper
           elevation={3}
           sx={{
-            px: 3,
-            py: 1.5,
+            px: {xs: 1, sm: 3},
+            py: {xs: 1, sm: 1.5},
             display: "flex",
-            gap: 2,
-            borderRadius: 5,
+            gap: {xs: 1, sm: 2},
+            borderRadius: {xs: 3, sm: 5},
             bgcolor: "background.paper",
             border: "1px solid",
             borderColor: "divider",
@@ -651,7 +673,7 @@ const VideoRoom: React.FC = () => {
           <IconButton
             onClick={handleToggleAudio}
             sx={{
-              p: 1.5,
+              p: {xs: 1, sm: 1.5},
               bgcolor: isAudioEnabled ? "transparent" : "error.main",
               color: isAudioEnabled ? "inherit" : "white",
               "&:hover": {
@@ -659,12 +681,16 @@ const VideoRoom: React.FC = () => {
               },
             }}
           >
-            {isAudioEnabled ? <FiMic /> : <FiMicOff />}
+            {isAudioEnabled ? (
+              <FiMic size={isMobile ? 18 : 24} />
+            ) : (
+              <FiMicOff size={isMobile ? 18 : 24} />
+            )}
           </IconButton>
           <IconButton
             onClick={handleToggleVideo}
             sx={{
-              p: 1.5,
+              p: {xs: 1, sm: 1.5},
               bgcolor: isVideoEnabled ? "transparent" : "error.main",
               color: isVideoEnabled ? "inherit" : "white",
               "&:hover": {
@@ -672,12 +698,16 @@ const VideoRoom: React.FC = () => {
               },
             }}
           >
-            {isVideoEnabled ? <FiVideo /> : <FiVideoOff />}
+            {isVideoEnabled ? (
+              <FiVideo size={isMobile ? 18 : 24} />
+            ) : (
+              <FiVideoOff size={isMobile ? 18 : 24} />
+            )}
           </IconButton>
           <IconButton
             onClick={handleScreenShare}
             sx={{
-              p: 1.5,
+              p: {xs: 1, sm: 1.5},
               bgcolor: isScreenSharing ? "primary.main" : "transparent",
               color: isScreenSharing ? "white" : "inherit",
               "&:hover": {
@@ -685,22 +715,28 @@ const VideoRoom: React.FC = () => {
               },
             }}
           >
-            <FiMonitor />
+            <FiMonitor size={isMobile ? 18 : 24} />
           </IconButton>
-          <IconButton onClick={() => setIsChatOpen(true)} sx={{p: 1.5}}>
+          <IconButton
+            onClick={() => setIsChatOpen(true)}
+            sx={{p: {xs: 1, sm: 1.5}}}
+          >
             <Badge badgeContent={0} color="primary">
-              <FiMessageSquare />
+              <FiMessageSquare size={isMobile ? 18 : 24} />
             </Badge>
           </IconButton>
-          <IconButton onClick={() => setIsParticipantsOpen(true)} sx={{p: 1.5}}>
+          <IconButton
+            onClick={() => setIsParticipantsOpen(true)}
+            sx={{p: {xs: 1, sm: 1.5}}}
+          >
             <Badge badgeContent={participants.length} color="primary">
-              <FiUsers />
+              <FiUsers size={isMobile ? 18 : 24} />
             </Badge>
           </IconButton>
           <IconButton
             onClick={handleLeaveRoom}
             sx={{
-              p: 1.5,
+              p: {xs: 1, sm: 1.5},
               bgcolor: "error.main",
               color: "white",
               "&:hover": {
@@ -708,7 +744,7 @@ const VideoRoom: React.FC = () => {
               },
             }}
           >
-            <FiPhoneOff />
+            <FiPhoneOff size={isMobile ? 18 : 24} />
           </IconButton>
         </Paper>
       </Box>
@@ -720,8 +756,8 @@ const VideoRoom: React.FC = () => {
         onClose={() => setIsChatOpen(false)}
         PaperProps={{
           sx: {
-            width: 320,
-            marginLeft: "240px", // Account for sidebar
+            width: {xs: "100%", sm: 320},
+            marginLeft: {xs: 0, md: "240px"}, // Account for sidebar
           },
         }}
       >
@@ -734,8 +770,8 @@ const VideoRoom: React.FC = () => {
         onClose={() => setIsParticipantsOpen(false)}
         PaperProps={{
           sx: {
-            width: 320,
-            marginLeft: "240px", // Account for sidebar
+            width: {xs: "100%", sm: 320},
+            marginLeft: {xs: 0, md: "240px"}, // Account for sidebar
           },
         }}
       >

@@ -413,7 +413,7 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
   return (
     <Box
       sx={{
-        width: 320,
+        width: {xs: "100%", sm: 320},
         borderRight: 1,
         borderColor: "divider",
         height: "100vh",
@@ -422,7 +422,7 @@ const ChatList: React.FC<ChatListProps> = ({currentChat, onChatSelect}) => {
         flexDirection: "column",
       }}
     >
-      <Box sx={{p: 2, display: "flex", gap: 1}}>
+      <Box sx={{p: 2, display: "flex", gap: 1, ml: {xs: 4, sm: 1}}}>
         <TextField
           fullWidth
           placeholder="Search chats..."

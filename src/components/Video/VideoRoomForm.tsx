@@ -8,6 +8,7 @@ import {
   Divider,
   useTheme,
   alpha,
+  useMediaQuery,
 } from "@mui/material";
 import {FiVideo, FiLogIn, FiUsers} from "react-icons/fi";
 
@@ -22,6 +23,7 @@ const VideoRoomForm: React.FC<VideoRoomFormProps> = ({
 }) => {
   const [roomId, setRoomId] = useState("");
   const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +39,7 @@ const VideoRoomForm: React.FC<VideoRoomFormProps> = ({
         alignItems: "center",
         justifyContent: "center",
         minHeight: "100vh",
-        p: 2,
+        p: isSmallScreen ? 1 : 2,
         background: `linear-gradient(45deg, ${alpha(
           theme.palette.primary.main,
           0.05
@@ -47,8 +49,8 @@ const VideoRoomForm: React.FC<VideoRoomFormProps> = ({
       <Paper
         elevation={3}
         sx={{
-          p: 4,
-          maxWidth: 400,
+          p: isSmallScreen ? 2 : 4,
+          maxWidth: isSmallScreen ? "90vw" : 400,
           width: "100%",
           borderRadius: 3,
           border: "1px solid",
@@ -58,7 +60,10 @@ const VideoRoomForm: React.FC<VideoRoomFormProps> = ({
         }}
       >
         <Box sx={{mb: 4, textAlign: "center"}}>
-          <FiUsers size={40} color={theme.palette.primary.main} />
+          <FiUsers
+            size={isSmallScreen ? 30 : 40}
+            color={theme.palette.primary.main}
+          />
           <Typography
             variant="h5"
             sx={{

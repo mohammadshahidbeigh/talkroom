@@ -634,13 +634,25 @@ const MessageArea: React.FC<MessageAreaProps> = ({
         <Box
           sx={{
             display: "flex",
-            alignItems: "center",
             justifyContent: "space-between",
+            alignItems: "flex-start",
+            ml: {xs: 4, sm: 1},
           }}
         >
-          <Typography variant="h6">
-            {currentChat.name || "Ongoing Chat"}
-          </Typography>
+          <Box>
+            <Typography variant="h6">
+              {currentChat?.name || "Ongoing Chat"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {currentChat?.type === "direct"
+                ? participants.find((p) => p.id !== currentUser?.id)
+                    ?.username || ""
+                : participants
+                    .map((p) => (p.id === currentUser?.id ? "You" : p.username))
+                    .join(", ")}
+            </Typography>
+          </Box>
+
           <Box
             sx={{
               display: "flex",
@@ -662,13 +674,6 @@ const MessageArea: React.FC<MessageAreaProps> = ({
             </Typography>
           </Box>
         </Box>
-        <Typography variant="body2" color="text.secondary">
-          {currentChat.type === "direct"
-            ? participants.find((p) => p.id !== currentUser?.id)?.username || ""
-            : participants
-                .map((p) => (p.id === currentUser?.id ? "You" : p.username))
-                .join(", ")}
-        </Typography>
       </Box>
 
       {/* Messages Area */}
@@ -788,7 +793,15 @@ const MessageArea: React.FC<MessageAreaProps> = ({
       </Menu>
 
       {/* Message Input */}
-      <Box sx={{p: 2, bgcolor: "background.paper"}}>
+      <Box
+        sx={{
+          p: 1,
+          bgcolor: "background.paper",
+          position: "sticky",
+          bottom: 0,
+          zIndex: 1,
+        }}
+      >
         {filePreview && renderFilePreview()}
         <TextField
           fullWidth
@@ -803,50 +816,60 @@ const MessageArea: React.FC<MessageAreaProps> = ({
           }}
           multiline
           maxRows={4}
+          size="small"
+          sx={{
+            "& .MuiInputBase-root": {
+              borderRadius: 2,
+            },
+          }}
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
-                <label htmlFor="file-upload">
-                  <HiddenInput
-                    id="file-upload"
-                    type="file"
-                    onChange={handleFileSelect}
-                    accept="image/*,video/*,application/*"
-                  />
-                  <IconButton component="span">
-                    <FiPaperclip />
+                <Box sx={{display: "flex", gap: 1}}>
+                  <label htmlFor="file-upload">
+                    <HiddenInput
+                      id="file-upload"
+                      type="file"
+                      onChange={handleFileSelect}
+                      accept="image/*,video/*,application/*"
+                    />
+                    <IconButton component="span" size="small">
+                      <FiPaperclip />
+                    </IconButton>
+                  </label>
+                  <IconButton onClick={handleEmojiButtonClick} size="small">
+                    <FiSmile />
                   </IconButton>
-                </label>
-                <IconButton onClick={handleEmojiButtonClick}>
-                  <FiSmile />
-                </IconButton>
-                <IconButton
-                  onClick={filePreview ? handleUploadFile : onSendMessage}
-                  color="primary"
-                  disabled={!messageInput.trim() && !filePreview}
-                >
-                  <FiSend />
-                </IconButton>
+                  <IconButton
+                    onClick={filePreview ? handleUploadFile : onSendMessage}
+                    color="primary"
+                    disabled={!messageInput.trim() && !filePreview}
+                    size="small"
+                  >
+                    <FiSend />
+                  </IconButton>
+                </Box>
               </InputAdornment>
             ),
           }}
         />
-        <Popover
-          open={Boolean(anchorEl)}
-          anchorEl={anchorEl}
-          onClose={handleCloseEmojiPicker}
-          anchorOrigin={{
-            vertical: "top",
-            horizontal: "right",
-          }}
-          transformOrigin={{
-            vertical: "bottom",
-            horizontal: "right",
-          }}
-        >
-          <EmojiPicker onEmojiClick={handleEmojiClick} />
-        </Popover>
       </Box>
+
+      <Popover
+        open={Boolean(anchorEl)}
+        anchorEl={anchorEl}
+        onClose={handleCloseEmojiPicker}
+        anchorOrigin={{
+          vertical: "top",
+          horizontal: "right",
+        }}
+        transformOrigin={{
+          vertical: "bottom",
+          horizontal: "right",
+        }}
+      >
+        <EmojiPicker onEmojiClick={handleEmojiClick} />
+      </Popover>
 
       <Snackbar
         open={notification.open}

@@ -15,6 +15,7 @@ import {
   ListItem,
   ListItemText,
   ListItemAvatar,
+  useMediaQuery,
 } from "@mui/material";
 import {
   FiBell,
@@ -61,6 +62,9 @@ const Header = () => {
   const [notificationAnchor, setNotificationAnchor] =
     useState<null | HTMLElement>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  // Add responsive breakpoints
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   // Handle socket events for notifications
   useEffect(() => {
@@ -179,33 +183,36 @@ const Header = () => {
     <Paper
       elevation={3}
       sx={{
-        px: 3,
-        py: 2,
+        px: {xs: 2, sm: 3},
+        py: {xs: 1.5, sm: 2},
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
         borderRadius: 0,
       }}
     >
-      <Box sx={{display: "flex", alignItems: "center", gap: 2}}>
+      <Box sx={{display: "flex", alignItems: "center", gap: {xs: 1, sm: 2}}}>
         <Typography
-          variant="h5"
+          variant={isMobile ? "h6" : "h5"}
           sx={{
             fontWeight: 600,
             background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
             backgroundClip: "text",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
+            mt: 1,
+            ml: {xs: 4, sm: 1},
           }}
         >
-          Dashboard
+          {isMobile ? "Dashboard" : "Dashboard"}
         </Typography>
       </Box>
 
-      <Box sx={{display: "flex", alignItems: "center", gap: 2}}>
+      <Box sx={{display: "flex", alignItems: "center", gap: {xs: 1, sm: 2}}}>
         <Tooltip title="Notifications">
           <IconButton
             onClick={handleNotificationClick}
+            size={isMobile ? "small" : "medium"}
             sx={{
               "&:hover": {color: theme.palette.primary.main},
               transition: "color 0.2s",
@@ -224,12 +231,15 @@ const Header = () => {
           PaperProps={{
             elevation: 3,
             sx: {
-              width: 320,
-              maxHeight: 400,
+              width: {xs: 280, sm: 320},
+              maxHeight: {xs: 350, sm: 400},
             },
           }}
         >
-          <Typography variant="h6" sx={{px: 2, py: 1}}>
+          <Typography
+            variant={isMobile ? "subtitle1" : "h6"}
+            sx={{px: 2, py: 1}}
+          >
             Notifications
           </Typography>
           <Divider />
@@ -240,16 +250,29 @@ const Header = () => {
                   key={notification.id}
                   sx={{
                     bgcolor: notification.read ? "transparent" : "action.hover",
+                    py: {xs: 1, sm: 1.5},
                   }}
                 >
                   <ListItemAvatar>
-                    <Avatar sx={{bgcolor: theme.palette.primary.main}}>
+                    <Avatar
+                      sx={{
+                        bgcolor: theme.palette.primary.main,
+                        width: isMobile ? 32 : 40,
+                        height: isMobile ? 32 : 40,
+                      }}
+                    >
                       {getNotificationIcon(notification.type)}
                     </Avatar>
                   </ListItemAvatar>
                   <ListItemText
                     primary={notification.content}
                     secondary={formatNotificationTime(notification.timestamp)}
+                    primaryTypographyProps={{
+                      fontSize: isMobile ? "0.9rem" : "1rem",
+                    }}
+                    secondaryTypographyProps={{
+                      fontSize: isMobile ? "0.8rem" : "0.875rem",
+                    }}
                   />
                 </ListItem>
               ))
@@ -264,17 +287,20 @@ const Header = () => {
           </List>
         </Menu>
 
-        <Tooltip title="Settings">
-          <IconButton
-            onClick={() => navigate("/profile")}
-            sx={{
-              "&:hover": {color: theme.palette.primary.main},
-              transition: "color 0.2s",
-            }}
-          >
-            <FiSettings />
-          </IconButton>
-        </Tooltip>
+        {!isMobile && (
+          <Tooltip title="Settings">
+            <IconButton
+              onClick={() => navigate("/profile")}
+              size={isMobile ? "small" : "medium"}
+              sx={{
+                "&:hover": {color: theme.palette.primary.main},
+                transition: "color 0.2s",
+              }}
+            >
+              <FiSettings />
+            </IconButton>
+          </Tooltip>
+        )}
 
         <Tooltip title="Profile">
           <Avatar
@@ -287,6 +313,8 @@ const Header = () => {
                 transform: "scale(1.1)",
               },
               bgcolor: theme.palette.primary.main,
+              width: isMobile ? 32 : 40,
+              height: isMobile ? 32 : 40,
             }}
             onClick={handleMenuOpen}
           />
@@ -300,7 +328,7 @@ const Header = () => {
             elevation: 3,
             sx: {
               mt: 1.5,
-              minWidth: 180,
+              minWidth: {xs: 160, sm: 180},
             },
           }}
         >
@@ -313,6 +341,17 @@ const Header = () => {
             <FiUser style={{marginRight: 8}} />
             Profile
           </MenuItem>
+          {isMobile && (
+            <MenuItem
+              onClick={() => {
+                navigate("/profile");
+                handleMenuClose();
+              }}
+            >
+              <FiSettings style={{marginRight: 8}} />
+              Settings
+            </MenuItem>
+          )}
           <Divider />
           <MenuItem onClick={handleLogout} sx={{color: "error.main"}}>
             <FiLogOut style={{marginRight: 8}} />

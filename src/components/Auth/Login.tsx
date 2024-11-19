@@ -11,6 +11,8 @@ import {
   IconButton,
   Snackbar,
   Alert,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import {useForm, Controller, SubmitHandler} from "react-hook-form";
 import {yupResolver} from "@hookform/resolvers/yup";
@@ -47,6 +49,10 @@ const Login = () => {
     message: "",
     severity: "success" as "success" | "error",
   });
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
 
   const {control, handleSubmit} = useForm<FormData>({
     defaultValues: {
@@ -134,25 +140,32 @@ const Login = () => {
         backgroundColor: "#1a1a2e",
         position: "relative",
         overflow: "hidden",
+        padding: isMobile ? "1rem" : "2rem",
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          left: "15%",
-        }}
-      >
-        <FaVideo size={40} color="#4A90E2" />
-      </div>
+      {!isMobile && (
+        <>
+          <div
+            style={{
+              position: "absolute",
+              left: isTablet ? "10%" : "15%",
+              display: isMobile ? "none" : "block",
+            }}
+          >
+            <FaVideo size={isTablet ? 30 : 40} color="#4A90E2" />
+          </div>
 
-      <div
-        style={{
-          position: "absolute",
-          right: "15%",
-        }}
-      >
-        <FaComments size={40} color="#4A90E2" />
-      </div>
+          <div
+            style={{
+              position: "absolute",
+              right: isTablet ? "10%" : "15%",
+              display: isMobile ? "none" : "block",
+            }}
+          >
+            <FaComments size={isTablet ? 30 : 40} color="#4A90E2" />
+          </div>
+        </>
+      )}
 
       <Snackbar
         open={notification.open}
@@ -171,15 +184,16 @@ const Login = () => {
 
       <Card
         sx={{
-          maxWidth: 400,
+          maxWidth: isMobile ? "100%" : isTablet ? 350 : 400,
           width: "100%",
           background: "rgba(255, 255, 255, 0.9)",
           backdropFilter: "blur(10px)",
-          borderRadius: "16px",
+          borderRadius: isMobile ? "12px" : "16px",
           boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.37)",
+          margin: isMobile ? "0" : "auto",
         }}
       >
-        <CardContent>
+        <CardContent sx={{padding: isMobile ? "16px" : "24px"}}>
           <Box
             component="form"
             onSubmit={handleSubmit(onSubmit)}
@@ -193,23 +207,23 @@ const Login = () => {
               src="/src/public/svg.svg"
               alt="App Logo"
               style={{
-                marginBottom: 16,
-                width: 100,
+                marginBottom: isMobile ? 12 : 16,
+                width: isMobile ? 80 : 100,
                 filter: "drop-shadow(0 0 10px rgba(74, 144, 226, 0.5))",
               }}
             />
 
             <Typography
-              variant="h4"
+              variant={isMobile ? "h5" : "h4"}
               component="h1"
               gutterBottom
               sx={{
                 fontFamily: "Poppins, sans-serif",
                 fontWeight: "bold",
-                fontSize: "24px",
+                fontSize: isMobile ? "20px" : "24px",
                 color: "#333333",
                 textAlign: "center",
-                marginBottom: "1.5rem",
+                marginBottom: isMobile ? "1rem" : "1.5rem",
               }}
             >
               Welcome Back
@@ -237,7 +251,7 @@ const Login = () => {
                   }}
                   sx={{
                     fontFamily: "Inter, sans-serif",
-                    fontSize: "16px",
+                    fontSize: isMobile ? "14px" : "16px",
                     "& .MuiOutlinedInput-root": {
                       "&:hover fieldset": {
                         borderColor: "#4A90E2",
@@ -281,7 +295,7 @@ const Login = () => {
                   }}
                   sx={{
                     fontFamily: "Inter, sans-serif",
-                    fontSize: "16px",
+                    fontSize: isMobile ? "14px" : "16px",
                     "& .MuiOutlinedInput-root": {
                       "&:hover fieldset": {
                         borderColor: "#4A90E2",
@@ -297,7 +311,7 @@ const Login = () => {
                 display: "flex",
                 justifyContent: "flex-end",
                 width: "100%",
-                marginY: 2,
+                marginY: isMobile ? 1 : 2,
               }}
             >
               <Link
@@ -306,7 +320,7 @@ const Login = () => {
                   color: "#4A90E2",
                   textDecoration: "none",
                   fontFamily: "Inter, sans-serif",
-                  fontSize: "14px",
+                  fontSize: isMobile ? "12px" : "14px",
                   pointerEvents: "none",
                   opacity: 0.5,
                 }}
@@ -321,16 +335,16 @@ const Login = () => {
               fullWidth
               disabled={isLoading}
               sx={{
-                mt: 3,
-                mb: 2,
+                mt: isMobile ? 2 : 3,
+                mb: isMobile ? 1.5 : 2,
                 background: "linear-gradient(45deg, #4A90E2 30%, #63B3ED 90%)",
                 "&:hover": {
                   background:
                     "linear-gradient(45deg, #357ABD 30%, #4A90E2 90%)",
                 },
                 fontFamily: "Inter, sans-serif",
-                fontSize: "16px",
-                padding: "12px",
+                fontSize: isMobile ? "14px" : "16px",
+                padding: isMobile ? "8px" : "12px",
                 borderRadius: "8px",
                 textTransform: "none",
                 boxShadow: "0 4px 6px rgba(74, 144, 226, 0.25)",
@@ -343,7 +357,7 @@ const Login = () => {
               variant="body2"
               sx={{
                 fontFamily: "Inter, sans-serif",
-                fontSize: "14px",
+                fontSize: isMobile ? "12px" : "14px",
                 textAlign: "center",
               }}
             >

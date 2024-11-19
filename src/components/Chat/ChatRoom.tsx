@@ -1,5 +1,5 @@
 // client/src/components/Chat/ChatRoom.tsx
-import {Box, Snackbar, Alert} from "@mui/material";
+import {Box, Snackbar, Alert, useTheme, useMediaQuery} from "@mui/material";
 import {Sidebar} from "../Layout";
 import {useEffect, useState} from "react";
 import useSocket from "../../hooks/useSocket";
@@ -52,6 +52,10 @@ const ChatRoom: React.FC = () => {
     message: "",
     severity: "success",
   });
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [showChatList, setShowChatList] = useState(true);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   // Use RTK Query hooks
   const [sendMessage] = useSendMessageMutation();
@@ -377,6 +381,11 @@ const ChatRoom: React.FC = () => {
     }
   }, [socket, currentChat, user]);
 
+  useEffect(() => {
+    setIsMobileView(isMobile);
+    setShowChatList(isMobile && !currentChat);
+  }, [isMobile, currentChat]);
+
   return (
     <Box
       sx={{
@@ -392,23 +401,35 @@ const ChatRoom: React.FC = () => {
         sx={{
           display: "flex",
           flexGrow: 1,
-          marginLeft: "240px",
+          marginLeft: {xs: 0, sm: "240px"},
           overflow: "hidden",
         }}
       >
-        <ChatList currentChat={currentChat} onChatSelect={handleChatSelect} />
+        {(!isMobileView || (isMobileView && showChatList)) && (
+          <ChatList
+            currentChat={currentChat}
+            onChatSelect={(chat) => {
+              handleChatSelect(chat);
+              if (isMobileView) {
+                setShowChatList(false);
+              }
+            }}
+          />
+        )}
 
-        <MessageArea
-          currentChat={currentChat}
-          messages={messageList}
-          setMessages={setMessageList}
-          participants={participants}
-          messageInput={messageInput}
-          setMessageInput={setMessageInput}
-          onSendMessage={handleSendMessage}
-          onFileUpload={handleFileUpload}
-          onDeleteMessage={handleDeleteMessage}
-        />
+        {(!isMobileView || (isMobileView && !showChatList)) && (
+          <MessageArea
+            currentChat={currentChat}
+            messages={messageList}
+            setMessages={setMessageList}
+            participants={participants}
+            messageInput={messageInput}
+            setMessageInput={setMessageInput}
+            onSendMessage={handleSendMessage}
+            onFileUpload={handleFileUpload}
+            onDeleteMessage={handleDeleteMessage}
+          />
+        )}
       </Box>
 
       <Snackbar

@@ -13,6 +13,8 @@ import {
   ListItemAvatar,
   ListItemText,
   Divider,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import {FiUser, FiMessageCircle, FiVideo, FiTrendingUp} from "react-icons/fi";
 import {Header, Sidebar} from "./Layout";
@@ -80,6 +82,9 @@ const getActivityIcon = (type: string): JSX.Element => {
 };
 
 const Dashboard = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.down("md"));
   const user = useAppSelector((state) => state.auth.user);
   const socket = useSocket();
   const {data: chats = [], refetch} = useGetChatsQuery();
@@ -292,8 +297,18 @@ const Dashboard = () => {
           flexGrow: 1,
           display: "flex",
           flexDirection: "column",
-          marginLeft: "240px", // Match sidebar width
-          width: "calc(100% - 240px)", // Adjust width accounting for sidebar
+          marginLeft: {
+            xs: 0,
+            sm: isMobile ? 0 : "240px",
+          },
+          width: {
+            xs: "100%",
+            sm: isMobile ? "100%" : "calc(100% - 240px)",
+          },
+          transition: theme.transitions.create(["margin", "width"], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.leavingScreen,
+          }),
         }}
       >
         {/* Header */}
@@ -304,26 +319,31 @@ const Dashboard = () => {
           sx={{
             flexGrow: 1,
             overflow: "auto",
-            p: 3,
+            p: {xs: 2, sm: 3},
             height: "calc(100vh - 64px)", // Account for header height
             backgroundColor: "#f5f5f5",
           }}
         >
           <Typography
-            variant="h4"
+            variant={isMobile ? "h5" : "h4"}
             sx={{
-              mb: 4,
+              mb: {xs: 2, sm: 4},
               fontWeight: "bold",
               color: "primary.main",
               borderBottom: "2px solid",
               borderColor: "primary.main",
               paddingBottom: 1,
+              fontSize: {
+                xs: "1.5rem",
+                sm: "2rem",
+                md: "2.125rem",
+              },
             }}
           >
             Welcome back, {user?.fullName || "Guest"}!
           </Typography>
 
-          <Grid container spacing={3}>
+          <Grid container spacing={isMobile ? 2 : 3}>
             {[
               {
                 title: "Total Users",
@@ -349,7 +369,7 @@ const Dashboard = () => {
                 progress: 45,
               },
             ].map((item) => (
-              <Grid item xs={12} sm={6} md={4} key={item.title}>
+              <Grid item xs={12} sm={isTablet ? 6 : 4} key={item.title}>
                 <Card
                   elevation={3}
                   sx={{
@@ -361,13 +381,17 @@ const Dashboard = () => {
                   }}
                 >
                   <CardHeader
-                    title={item.title}
+                    title={
+                      <Typography variant={isMobile ? "h6" : "h5"}>
+                        {item.title}
+                      </Typography>
+                    }
                     action={
                       <Avatar
                         sx={{
                           bgcolor: "primary.main",
-                          width: 48,
-                          height: 48,
+                          width: isMobile ? 40 : 48,
+                          height: isMobile ? 40 : 48,
                         }}
                       >
                         {item.icon}
@@ -375,7 +399,17 @@ const Dashboard = () => {
                     }
                   />
                   <CardContent>
-                    <Typography variant="h4" sx={{fontWeight: "bold"}}>
+                    <Typography
+                      variant={isMobile ? "h5" : "h4"}
+                      sx={{
+                        fontWeight: "bold",
+                        fontSize: {
+                          xs: "1.5rem",
+                          sm: "2rem",
+                          md: "2.125rem",
+                        },
+                      }}
+                    >
                       {item.value}
                     </Typography>
                     <Typography
@@ -385,6 +419,10 @@ const Dashboard = () => {
                         display: "flex",
                         alignItems: "center",
                         gap: 0.5,
+                        fontSize: {
+                          xs: "0.8rem",
+                          sm: "0.875rem",
+                        },
                       }}
                     >
                       <FiTrendingUp /> {item.change} from last period
@@ -403,7 +441,7 @@ const Dashboard = () => {
           <Card
             elevation={3}
             sx={{
-              mt: 4,
+              mt: {xs: 2, sm: 4},
               transition: "transform 0.2s",
               "&:hover": {
                 transform: "translateY(-4px)",
@@ -412,36 +450,64 @@ const Dashboard = () => {
             }}
           >
             <CardHeader
-              title="Recent Activity"
+              title={
+                <Typography
+                  variant={isMobile ? "h6" : "h5"}
+                  sx={{
+                    fontWeight: "bold",
+                    color: "primary.main",
+                  }}
+                >
+                  Recent Activity
+                </Typography>
+              }
               sx={{
                 borderBottom: "1px solid",
                 borderColor: "divider",
-                "& .MuiTypography-root": {
-                  fontWeight: "bold",
-                  color: "primary.main",
-                },
+                p: {xs: 2, sm: 3},
               }}
             />
-            <CardContent>
+            <CardContent sx={{p: {xs: 1, sm: 2}}}>
               <List>
                 {recentActivities.map((activity) => (
                   <Box key={activity.id}>
                     <ListItem>
                       <ListItemAvatar>
-                        <Avatar sx={{bgcolor: "primary.main"}}>
+                        <Avatar
+                          sx={{
+                            bgcolor: "primary.main",
+                            width: isMobile ? 32 : 40,
+                            height: isMobile ? 32 : 40,
+                          }}
+                        >
                           {activity.icon}
                         </Avatar>
                       </ListItemAvatar>
                       <ListItemText
-                        primary={activity.type}
-                        secondary={activity.description}
+                        primary={
+                          <Typography
+                            variant={isMobile ? "body1" : "h6"}
+                            sx={{fontWeight: "bold"}}
+                          >
+                            {activity.type}
+                          </Typography>
+                        }
+                        secondary={
+                          <Typography variant={isMobile ? "body2" : "body1"}>
+                            {activity.description}
+                          </Typography>
+                        }
+                      />
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
                         sx={{
-                          "& .MuiListItemText-primary": {
-                            fontWeight: "bold",
+                          fontSize: {
+                            xs: "0.7rem",
+                            sm: "0.75rem",
                           },
                         }}
-                      />
-                      <Typography variant="caption" color="text.secondary">
+                      >
                         {formatTimestamp(activity.timestamp)}
                       </Typography>
                     </ListItem>

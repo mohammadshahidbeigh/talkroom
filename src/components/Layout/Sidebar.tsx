@@ -8,6 +8,9 @@ import {
   useTheme,
   Snackbar,
   Alert,
+  useMediaQuery,
+  IconButton,
+  Drawer,
 } from "@mui/material";
 import {
   FiBarChart,
@@ -15,6 +18,7 @@ import {
   FiUser,
   FiVideo,
   FiLogOut,
+  FiMenu,
 } from "react-icons/fi";
 import {useDispatch} from "react-redux";
 import {logout} from "../../store/slices/authSlice";
@@ -25,6 +29,9 @@ const Sidebar = () => {
   const theme = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.down("md"));
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const [notification, setNotification] = useState<{
     open: boolean;
@@ -57,119 +64,176 @@ const Sidebar = () => {
     }
   };
 
-  return (
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+
+  const sidebarContent = (
     <>
-      <Paper
-        elevation={3}
+      <Box
         sx={{
-          width: 240,
-          height: "100vh",
-          position: "fixed",
-          left: 0,
-          top: 0,
+          p: 3,
           display: "flex",
-          flexDirection: "column",
-          borderRight: "1px solid",
-          borderColor: "divider",
-          bgcolor: "background.paper",
-          transition: "all 0.3s ease",
+          alignItems: "center",
+          gap: 2,
+          ml: {xs: 4, sm: 1},
         }}
       >
-        <Box sx={{p: 3, display: "flex", alignItems: "center", gap: 2}}>
-          <img
-            src="/src/public/logo.png"
-            alt="App Logo"
-            style={{width: "40px", height: "auto"}}
-          />
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: 600,
-              background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-              backgroundClip: "text",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            TalkRoom
-          </Typography>
-        </Box>
-        <Box component="nav" sx={{mt: 2, flexGrow: 1}}>
-          {[
-            {icon: <FiBarChart />, label: "Dashboard", to: "/dashboard"},
-            {icon: <FiMessageCircle />, label: "Chat", to: "/chat"},
-            {icon: <FiVideo />, label: "Video Room", to: "/video"},
-            {icon: <FiUser />, label: "Profile", to: "/profile"},
-          ].map((item) => (
-            <Link
-              key={item.label}
-              to={item.to}
-              style={{textDecoration: "none", color: "inherit"}}
-            >
-              <Button
-                startIcon={item.icon}
-                fullWidth
-                sx={{
-                  justifyContent: "flex-start",
-                  px: 3,
-                  py: 1.5,
-                  borderRadius: 0,
-                  position: "relative",
-                  color:
-                    location.pathname === item.to ? "primary.main" : "inherit",
-                  "&:hover": {
-                    bgcolor: "action.hover",
-                    color: "primary.main",
-                  },
-                  "&::before": {
-                    content: '""',
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: "3px",
-                    bgcolor: "primary.main",
-                    opacity: location.pathname === item.to ? 1 : 0,
-                    transition: "opacity 0.2s",
-                  },
-                  transition: "all 0.2s",
-                }}
-              >
-                {item.label}
-              </Button>
-            </Link>
-          ))}
-        </Box>
-
-        <Box
+        <img
+          src="/src/public/logo.png"
+          alt="App Logo"
+          style={{width: isMobile ? "32px" : "40px", height: "auto"}}
+        />
+        <Typography
+          variant={isMobile ? "subtitle1" : "h6"}
           sx={{
-            p: 2,
-            mt: "auto",
-            borderTop: "1px solid",
-            borderColor: "divider",
+            fontWeight: 600,
+            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+            backgroundClip: "text",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
           }}
         >
-          <Button
-            fullWidth
-            startIcon={<FiLogOut />}
-            onClick={handleLogout}
-            sx={{
-              justifyContent: "flex-start",
-              px: 3,
-              py: 1.5,
-              borderRadius: 1,
-              color: "error.main",
-              "&:hover": {
-                bgcolor: "error.light",
-                color: "error.dark",
-              },
-              transition: "all 0.2s",
-            }}
+          TalkRoom
+        </Typography>
+      </Box>
+      <Box component="nav" sx={{mt: 2, flexGrow: 1}}>
+        {[
+          {icon: <FiBarChart />, label: "Dashboard", to: "/dashboard"},
+          {icon: <FiMessageCircle />, label: "Chat", to: "/chat"},
+          {icon: <FiVideo />, label: "Video Room", to: "/video"},
+          {icon: <FiUser />, label: "Profile", to: "/profile"},
+        ].map((item) => (
+          <Link
+            key={item.label}
+            to={item.to}
+            style={{textDecoration: "none", color: "inherit"}}
+            onClick={() => isMobile && setMobileOpen(false)}
           >
-            Logout
-          </Button>
-        </Box>
-      </Paper>
+            <Button
+              startIcon={item.icon}
+              fullWidth
+              sx={{
+                justifyContent: "flex-start",
+                px: 3,
+                py: isMobile ? 1 : 1.5,
+                borderRadius: 0,
+                position: "relative",
+                color:
+                  location.pathname === item.to ? "primary.main" : "inherit",
+                "&:hover": {
+                  bgcolor: "action.hover",
+                  color: "primary.main",
+                },
+                "&::before": {
+                  content: '""',
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: "3px",
+                  bgcolor: "primary.main",
+                  opacity: location.pathname === item.to ? 1 : 0,
+                  transition: "opacity 0.2s",
+                },
+                transition: "all 0.2s",
+              }}
+            >
+              {item.label}
+            </Button>
+          </Link>
+        ))}
+      </Box>
+
+      <Box
+        sx={{
+          p: 2,
+          mt: "auto",
+          borderTop: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <Button
+          fullWidth
+          startIcon={<FiLogOut />}
+          onClick={handleLogout}
+          sx={{
+            justifyContent: "flex-start",
+            px: 3,
+            py: isMobile ? 1 : 1.5,
+            borderRadius: 1,
+            color: "error.main",
+            "&:hover": {
+              bgcolor: "error.light",
+              color: "error.dark",
+            },
+            transition: "all 0.2s",
+          }}
+        >
+          Logout
+        </Button>
+      </Box>
+    </>
+  );
+
+  return (
+    <>
+      {isMobile && (
+        <IconButton
+          color="inherit"
+          aria-label="open drawer"
+          edge="start"
+          onClick={handleDrawerToggle}
+          sx={{
+            position: "fixed",
+            left: 16,
+            top: 16,
+            zIndex: theme.zIndex.drawer + 2,
+          }}
+        >
+          <FiMenu />
+        </IconButton>
+      )}
+
+      {isMobile ? (
+        <Drawer
+          variant="temporary"
+          anchor="left"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile.
+          }}
+          sx={{
+            "& .MuiDrawer-paper": {
+              width: 240,
+              bgcolor: "background.paper",
+            },
+          }}
+        >
+          {sidebarContent}
+        </Drawer>
+      ) : (
+        <Paper
+          elevation={3}
+          sx={{
+            width: isTablet ? 200 : 240,
+            height: "100vh",
+            position: "fixed",
+            left: 0,
+            top: 0,
+            display: "flex",
+            flexDirection: "column",
+            borderRight: "1px solid",
+            borderColor: "divider",
+            bgcolor: "background.paper",
+            transition: "all 0.3s ease",
+          }}
+        >
+          {sidebarContent}
+        </Paper>
+      )}
+
       <Snackbar
         open={notification.open}
         autoHideDuration={6000}

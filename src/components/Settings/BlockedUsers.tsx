@@ -5,6 +5,8 @@ import {
   ListItemText,
   IconButton,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import {FiUserCheck} from "react-icons/fi";
 
@@ -23,11 +25,19 @@ const BlockedUsers: React.FC<BlockedUsersProps> = ({
   blockedUsers,
   onUnblock,
 }) => {
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
+
   return (
-    <Box>
+    <Box sx={{padding: isSmallScreen ? 1 : 2}}>
       <Typography
-        variant="h6"
-        sx={{mb: 2, ml: 2, fontWeight: "bold", color: "text.primary"}}
+        variant={isSmallScreen ? "subtitle1" : "h6"}
+        sx={{
+          mb: isSmallScreen ? 1 : 2,
+          ml: isSmallScreen ? 1 : 2,
+          fontWeight: "bold",
+          color: "text.primary",
+        }}
       >
         Muted Users
       </Typography>
@@ -40,12 +50,18 @@ const BlockedUsers: React.FC<BlockedUsersProps> = ({
                 edge="end"
                 onClick={() => onUnblock(blocked.userId)}
                 color="primary"
+                size={isSmallScreen ? "small" : "medium"}
               >
                 <FiUserCheck />
               </IconButton>
             }
           >
-            <ListItemText primary={blocked.username} />
+            <ListItemText
+              primary={blocked.username}
+              primaryTypographyProps={{
+                variant: isSmallScreen ? "body2" : "body1",
+              }}
+            />
           </ListItem>
         ))}
         {blockedUsers.length === 0 && (
@@ -53,6 +69,9 @@ const BlockedUsers: React.FC<BlockedUsersProps> = ({
             <ListItemText
               primary="No muted users"
               sx={{color: "text.secondary"}}
+              primaryTypographyProps={{
+                variant: isSmallScreen ? "body2" : "body1",
+              }}
             />
           </ListItem>
         )}

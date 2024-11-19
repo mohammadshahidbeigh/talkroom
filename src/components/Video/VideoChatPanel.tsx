@@ -9,6 +9,7 @@ import {
   ListItem,
   useTheme,
   alpha,
+  useMediaQuery,
 } from "@mui/material";
 import {FiSend, FiX, FiMessageCircle} from "react-icons/fi";
 import useSocket from "../../hooks/useSocket";
@@ -34,6 +35,7 @@ const VideoChatPanel: React.FC<VideoChatPanelProps> = ({roomId, onClose}) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({behavior: "smooth"});
@@ -70,12 +72,12 @@ const VideoChatPanel: React.FC<VideoChatPanelProps> = ({roomId, onClose}) => {
   return (
     <Paper
       sx={{
-        width: 320,
+        width: isSmallScreen ? "100vw" : 320,
         height: "100vh",
         display: "flex",
         flexDirection: "column",
         bgcolor: "background.paper",
-        borderLeft: "1px solid",
+        borderLeft: isSmallScreen ? "none" : "1px solid",
         borderColor: "divider",
       }}
     >
@@ -90,7 +92,14 @@ const VideoChatPanel: React.FC<VideoChatPanelProps> = ({roomId, onClose}) => {
           bgcolor: alpha(theme.palette.primary.main, 0.05),
         }}
       >
-        <Box sx={{display: "flex", alignItems: "center", gap: 1}}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            ml: {xs: 4, sm: 1},
+          }}
+        >
           <FiMessageCircle size={24} color={theme.palette.primary.main} />
           <Typography variant="h6" sx={{fontWeight: 600}}>
             Chat

@@ -276,7 +276,12 @@ const UserProfile: React.FC<UserProfileProps> = () => {
 
   return (
     <Box
-      sx={{display: "flex", minHeight: "100vh", bgcolor: "background.default"}}
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        bgcolor: "background.default",
+        flexDirection: {xs: "column", md: "row"},
+      }}
     >
       <Sidebar />
       <Box
@@ -284,15 +289,11 @@ const UserProfile: React.FC<UserProfileProps> = () => {
           flexGrow: 1,
           display: "flex",
           flexDirection: "column",
-          marginLeft: "240px",
-          width: "calc(100% - 240px)",
+          marginLeft: {md: "240px"},
+          width: {xs: "100%", md: "calc(100% - 240px)"},
         }}
       >
-        <Box sx={{flexGrow: 1, overflow: "auto", p: 3}}>
-          <Typography variant="h4" sx={{fontWeight: "bold", mb: 3}}>
-            Profile Settings
-          </Typography>
-
+        <Box sx={{flexGrow: 1, overflow: "auto", p: {xs: 2, md: 3}, mt: 4}}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <Card>

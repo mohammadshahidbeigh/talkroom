@@ -1,6 +1,12 @@
 // client/src/components/Video/VideoStream.tsx
 import React, {useEffect, useRef, useState} from "react";
-import {Box, Typography, IconButton} from "@mui/material";
+import {
+  Box,
+  Typography,
+  IconButton,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
 import {styled} from "@mui/system";
 import {
   FiMicOff,
@@ -45,6 +51,11 @@ const VideoOverlay = styled(Box)(({theme}) => ({
   transition: "opacity 0.3s ease",
   opacity: 1,
   zIndex: 2,
+  [theme.breakpoints.down("sm")]: {
+    padding: theme.spacing(1),
+    flexDirection: "column",
+    alignItems: "flex-start",
+  },
 }));
 
 const ControlsOverlay = styled(Box)(({theme}) => ({
@@ -62,15 +73,23 @@ const ControlsOverlay = styled(Box)(({theme}) => ({
       backgroundColor: "rgba(0, 0, 0, 0.7)",
     },
   },
+  [theme.breakpoints.down("sm")]: {
+    top: theme.spacing(0.5),
+    right: theme.spacing(0.5),
+    gap: theme.spacing(0.25),
+  },
 }));
 
-const VideoContainer = styled(Box)({
+const VideoContainer = styled(Box)(({theme}) => ({
   "&:hover": {
     "& .controls-overlay": {
       opacity: 1,
     },
   },
-});
+  [theme.breakpoints.down("sm")]: {
+    borderRadius: 1,
+  },
+}));
 
 const VideoStream: React.FC<VideoStreamProps> = ({
   stream,
@@ -86,6 +105,8 @@ const VideoStream: React.FC<VideoStreamProps> = ({
   const [hasVideo, setHasVideo] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const playAttempts = useRef(0);
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
   const playVideo = async () => {
     const videoElement = videoRef.current;
@@ -178,9 +199,10 @@ const VideoStream: React.FC<VideoStreamProps> = ({
         position: "relative",
         width: "100%",
         height: "100%",
-        borderRadius: 2,
+        borderRadius: {xs: 1, sm: 2},
         overflow: "hidden",
         bgcolor: "background.paper",
+        minHeight: {xs: 150, sm: 300},
       }}
     >
       <StyledVideo
@@ -205,34 +227,61 @@ const VideoStream: React.FC<VideoStreamProps> = ({
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 1,
+            gap: {xs: 0.5, sm: 1},
             color: "white",
             zIndex: 1,
           }}
         >
-          <FiVideoOff size={40} />
-          <Typography variant="body2">Video Off</Typography>
+          <FiVideoOff size={isSmallScreen ? 24 : 40} />
+          <Typography variant={isSmallScreen ? "caption" : "body2"}>
+            Video Off
+          </Typography>
         </Box>
       )}
 
-      <ControlsOverlay className="controls-overlay">
-        <IconButton size="small" onClick={onPinStream}>
-          {isPinned ? <FiX /> : <FiBookmark />}
+      <ControlsOverlay
+        className="controls-overlay"
+        sx={{
+          "& .MuiIconButton-root": {
+            padding: {xs: 0.5, sm: 1},
+          },
+        }}
+      >
+        <IconButton
+          size={isSmallScreen ? "small" : "medium"}
+          onClick={onPinStream}
+        >
+          {isPinned ? (
+            <FiX size={isSmallScreen ? 16 : 20} />
+          ) : (
+            <FiBookmark size={isSmallScreen ? 16 : 20} />
+          )}
         </IconButton>
-        <IconButton size="small" onClick={toggleFullscreen}>
-          {isFullscreen ? <FiMinimize /> : <FiMaximize />}
+        <IconButton
+          size={isSmallScreen ? "small" : "medium"}
+          onClick={toggleFullscreen}
+        >
+          {isFullscreen ? (
+            <FiMinimize size={isSmallScreen ? 16 : 20} />
+          ) : (
+            <FiMaximize size={isSmallScreen ? 16 : 20} />
+          )}
         </IconButton>
       </ControlsOverlay>
 
-      <VideoOverlay>
+      <VideoOverlay
+        sx={{
+          padding: {xs: 1, sm: 1.5},
+        }}
+      >
         <Typography
-          variant="subtitle1"
+          variant={isSmallScreen ? "body2" : "subtitle1"}
           sx={{
             fontWeight: 600,
             textShadow: "0 1px 2px rgba(0,0,0,0.5)",
             display: "flex",
             alignItems: "center",
-            gap: 1,
+            gap: 0.5,
           }}
         >
           {username}
@@ -243,29 +292,30 @@ const VideoStream: React.FC<VideoStreamProps> = ({
               sx={{
                 bgcolor: "primary.main",
                 color: "white",
-                px: 1,
-                py: 0.5,
+                px: {xs: 0.5, sm: 1},
+                py: {xs: 0.25, sm: 0.5},
                 borderRadius: 1,
-                fontSize: "0.75rem",
+                fontSize: {xs: "0.625rem", sm: "0.75rem"},
               }}
             >
               You
             </Typography>
           )}
         </Typography>
-        <Box sx={{display: "flex", gap: 1, alignItems: "center"}}>
+
+        <Box sx={{display: "flex", gap: 0.5, alignItems: "center"}}>
           {!hasAudio && (
             <Box
               sx={{
                 bgcolor: "error.main",
                 color: "white",
-                p: 0.5,
+                p: {xs: 0.25, sm: 0.5},
                 borderRadius: 1,
                 display: "flex",
                 alignItems: "center",
               }}
             >
-              <FiMicOff size={16} />
+              <FiMicOff size={isSmallScreen ? 12 : 16} />
             </Box>
           )}
           {!hasVideo && (
@@ -273,13 +323,13 @@ const VideoStream: React.FC<VideoStreamProps> = ({
               sx={{
                 bgcolor: "error.main",
                 color: "white",
-                p: 0.5,
+                p: {xs: 0.25, sm: 0.5},
                 borderRadius: 1,
                 display: "flex",
                 alignItems: "center",
               }}
             >
-              <FiVideoOff size={16} />
+              <FiVideoOff size={isSmallScreen ? 12 : 16} />
             </Box>
           )}
         </Box>

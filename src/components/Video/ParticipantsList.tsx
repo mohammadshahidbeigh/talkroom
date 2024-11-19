@@ -13,6 +13,7 @@ import {
   useTheme,
   alpha,
   Badge,
+  useMediaQuery,
 } from "@mui/material";
 import {
   FiX,
@@ -50,6 +51,7 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
 }) => {
   const {data: roomParticipants} = useGetRoomParticipantsQuery(roomId);
   const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
   const getUsername = (userId: string) => {
     const participant = roomParticipants?.find((p) => p.userId === userId);
@@ -59,12 +61,12 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
   return (
     <Paper
       sx={{
-        width: 320,
+        width: isSmallScreen ? "100vw" : 320,
         height: "100vh",
         display: "flex",
         flexDirection: "column",
         bgcolor: "background.paper",
-        borderLeft: "1px solid",
+        borderLeft: isSmallScreen ? "none" : "1px solid",
         borderColor: "divider",
       }}
     >
@@ -79,7 +81,14 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
           bgcolor: alpha(theme.palette.primary.main, 0.05),
         }}
       >
-        <Box sx={{display: "flex", alignItems: "center", gap: 1}}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            ml: {xs: 4, sm: 1},
+          }}
+        >
           <FiUsers size={24} color={theme.palette.primary.main} />
           <Typography variant="h6" sx={{fontWeight: 600}}>
             Participants ({participants.length + 1})
