@@ -7,7 +7,7 @@ const redis = new Redis({
 
 // Connection handling
 redis.on("connect", () => {
-  console.log("✓ Redis connection established");
+  console.log("✓ Redis connection established 🔥");
 });
 
 redis.on("error", (error) => {
