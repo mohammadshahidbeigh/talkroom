@@ -286,7 +286,14 @@ const Dashboard = () => {
 
   return (
     <Box
-      sx={{display: "flex", minHeight: "100vh", bgcolor: "background.default"}}
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        bgcolor:
+          theme.palette.mode === "dark"
+            ? "background.paper"
+            : "background.default",
+      }}
     >
       {/* Sidebar */}
       <Sidebar />
@@ -321,7 +328,8 @@ const Dashboard = () => {
             overflow: "auto",
             p: {xs: 2, sm: 3},
             height: "calc(100vh - 64px)", // Account for header height
-            backgroundColor: "#f5f5f5",
+            backgroundColor:
+              theme.palette.mode === "dark" ? "#424242" : "#f5f5f5",
           }}
         >
           <Typography
