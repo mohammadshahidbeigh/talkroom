@@ -27,6 +27,8 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
 
 # Build output
 dist

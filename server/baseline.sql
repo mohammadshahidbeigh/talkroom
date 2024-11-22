@@ -55,6 +55,7 @@ CREATE TABLE "VideoRoom" (
     "id" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "endedAt" TIMESTAMP(3),
+    "creatorId" TEXT NOT NULL,
 
     CONSTRAINT "VideoRoom_pkey" PRIMARY KEY ("id")
 );
@@ -100,6 +101,12 @@ CREATE UNIQUE INDEX "User_githubId_key" ON "User"("githubId");
 -- CreateIndex
 CREATE UNIQUE INDEX "User_provider_providerId_key" ON "User"("provider", "providerId");
 
+-- CreateIndex
+CREATE INDEX "VideoRoomParticipant_roomId_idx" ON "VideoRoomParticipant"("roomId");
+
+-- CreateIndex
+CREATE INDEX "VideoRoomParticipant_userId_idx" ON "VideoRoomParticipant"("userId");
+
 -- AddForeignKey
 ALTER TABLE "Message" ADD CONSTRAINT "Message_senderId_fkey" FOREIGN KEY ("senderId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -113,6 +120,9 @@ ALTER TABLE "Participant" ADD CONSTRAINT "Participant_userId_fkey" FOREIGN KEY (
 ALTER TABLE "Participant" ADD CONSTRAINT "Participant_chatId_fkey" FOREIGN KEY ("chatId") REFERENCES "Chat"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "VideoRoom" ADD CONSTRAINT "VideoRoom_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "VideoRoomParticipant" ADD CONSTRAINT "VideoRoomParticipant_roomId_fkey" FOREIGN KEY ("roomId") REFERENCES "VideoRoom"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -123,3 +133,4 @@ ALTER TABLE "File" ADD CONSTRAINT "File_messageId_fkey" FOREIGN KEY ("messageId"
 
 -- AddForeignKey
 ALTER TABLE "File" ADD CONSTRAINT "File_uploadedBy_fkey" FOREIGN KEY ("uploadedBy") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
