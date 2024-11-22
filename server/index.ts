@@ -21,7 +21,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "https://talk-room-six.vercel.app",
+    origin: "https://talk-room-six.vercel.app/",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -33,7 +33,7 @@ const prisma = new PrismaClient();
 
 app.use(
   cors({
-    origin: "https://talk-room-six.vercel.app",
+    origin: "https://talk-room-six.vercel.app/",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: [
