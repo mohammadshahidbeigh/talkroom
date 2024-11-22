@@ -5,7 +5,7 @@ let socket: Socket | null = null;
 
 export const connectSocket = () => {
   if (!socket) {
-    socket = io("https://talk-room-server.vercel.app"); // Replace with your server URL
+    socket = io("https://talk-room-server.vercel.app/"); // Replace with your server URL
   }
   return socket;
 };
