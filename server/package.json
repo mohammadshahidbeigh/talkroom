@@ -17,8 +17,7 @@
     "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
-    "socket.io": "^4.8.1",
-    "typescript": "^5.6.3" 
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -32,11 +31,12 @@
     "@types/socket.io": "^3.0.2",
     "prisma": "^5.21.1",
     "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0"
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.6.3" 
   },
-  "scripts": {
+ "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only index.ts",
-    "build": "tsc",
+    "build": "tsc --outDir public",
     "start": "node dist/index.js"
   }
 }
