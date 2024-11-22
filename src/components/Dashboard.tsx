@@ -125,7 +125,7 @@ const Dashboard = () => {
         return;
       }
 
-      const response = await fetch("http://localhost:5000/metrics", {
+      const response = await fetch("https://talk-room-server.vercel.app/metrics", {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
