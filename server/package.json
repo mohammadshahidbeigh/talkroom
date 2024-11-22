@@ -34,10 +34,9 @@
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.6.3"
   },
-  "scripts": {
+ "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only index.ts",
-    "clean": "rm -rf dist",
-    "build": "yarn clean && yarn exec tsc",
+    "build": "tsc --outDir public",
     "start": "node dist/index.js"
   }
 }
