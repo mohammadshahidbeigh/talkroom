@@ -74,6 +74,10 @@ app.use(rateLimiter()); // Default limit for other routes
 // Apply static middleware (use spread operator since it's now an array)
 app.use("/uploads", ...staticMiddleware);
 
+app.get("/", (req, res) => {
+  res.status(200).send("Welcome to the API");
+});
+
 // Register routes
 app.use("/auth", authRoutes);
 app.use("/chat", chatRoutes);
