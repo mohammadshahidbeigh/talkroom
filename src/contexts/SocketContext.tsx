@@ -3,7 +3,7 @@ import React, {useEffect, useRef} from "react";
 import {io} from "socket.io-client";
 import {SocketContext} from "./SocketContextValue";
 
-const SOCKET_URL = "https://talk-room-server.vercel.app";
+const SOCKET_URL = "https://talk-room-server.vercel.app/";
 
 export const SocketProvider: React.FC<{children: React.ReactNode}> = ({
   children,
