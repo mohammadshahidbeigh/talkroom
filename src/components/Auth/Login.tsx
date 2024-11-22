@@ -72,7 +72,7 @@ const Login = () => {
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     try {
       setIsLoading(true);
-      const response = await fetch("https://talk-room-server.vercel.app/auth/login", {
+      const response = await fetch("http://localhost:5000/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

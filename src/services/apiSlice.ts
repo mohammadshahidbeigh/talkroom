@@ -12,7 +12,7 @@ import type {
   RootState,
 } from "../types";
 
-const BASE_URL = "https://talk-room-server.vercel.app/";
+const BASE_URL = "http://localhost:5000/";
 
 // Define tag types
 type TagTypes = "Messages";
