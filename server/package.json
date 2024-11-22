@@ -1,7 +1,7 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "main": "server/index.js",
+  "main": "server/index.ts",
   "license": "MIT",
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -37,6 +37,6 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only server/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.ts"
   }
 }
