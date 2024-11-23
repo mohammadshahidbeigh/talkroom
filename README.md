@@ -63,7 +63,7 @@ A modern and secure real-time chat application built with React, TypeScript, Nod
 - PostgreSQL 14+ with encrypted data
 - Prisma ORM with query protection
 - JWT with secure configurations
-- Jest for security testing
+- React Testing Library for security testing
 
 ## Getting Started
 
