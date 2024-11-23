@@ -1,4 +1,4 @@
-TalkRoom - Real-Time Chat Application
+## TalkRoom - Real-Time Chat Application
 
 A modern and secure real-time chat application built with React, TypeScript, Node.js, and WebSocket technology.
 
