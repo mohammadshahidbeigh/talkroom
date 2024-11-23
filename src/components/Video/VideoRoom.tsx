@@ -48,8 +48,8 @@ import {
   useLeaveVideoRoomMutation,
   useGetRoomParticipantsQuery,
 } from "../../services/apiSlice";
-import joinSound from "../../public/joined.mp3";
-import endSound from "../../public/End.mp3";
+import joinSound from "/joined.mp3";
+import endSound from "/End.mp3";
 
 interface Participant {
   userId: string;

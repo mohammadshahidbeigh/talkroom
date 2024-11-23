@@ -207,7 +207,7 @@ const Login = () => {
             }}
           >
             <img
-              src="/src/public/svg.svg"
+              src="/logo.png"
               alt="App Logo"
               style={{
                 marginBottom: isMobile ? 12 : 16,

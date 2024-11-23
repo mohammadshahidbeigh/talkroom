@@ -252,10 +252,10 @@ const ChatRoom: React.FC = () => {
             // Only play notification sound for new text/file messages, not system messages
             if (message.senderId !== user?.id && message.type !== "system") {
               try {
-                fetch("/src/public/notification.mp3")
+                fetch("/notification.mp3")
                   .then((response) => {
                     if (response.ok) {
-                      const audio = new Audio("/src/public/notification.mp3");
+                      const audio = new Audio("/notification.mp3");
                       audio.play().catch((err) => {
                         console.log("Audio playback failed:", err);
                       });

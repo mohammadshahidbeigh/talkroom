@@ -106,18 +106,31 @@ const Register = () => {
         throw new Error(errorMessage);
       }
 
-      // Store JWT token and user data
-      localStorage.setItem("token", responseData.token);
-      dispatch(login({user: responseData.user, token: responseData.token}));
-      setNotification({
-        open: true,
-        message: `Welcome to TalkRoom, ${responseData.user.username}!`,
-        severity: "success",
-      });
+      // Check if responseData.user exists before accessing properties
+      if (responseData.user && responseData.token) {
+        // Store JWT token and user data
+        localStorage.setItem("token", responseData.token);
+        dispatch(login({user: responseData.user, token: responseData.token}));
+        setNotification({
+          open: true,
+          message: `Welcome to TalkRoom, ${responseData.user.username}!`,
+          severity: "success",
+        });
 
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 1500);
+        // Navigate after successful registration
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 1500);
+      } else {
+        setNotification({
+          open: true,
+          message: "Registration successful! Please login to continue.",
+          severity: "success",
+        });
+        setTimeout(() => {
+          navigate("/login");
+        }, 1500);
+      }
     } catch (error) {
       setNotification({
         open: true,
@@ -206,7 +219,7 @@ const Register = () => {
             }}
           >
             <img
-              src="/src/public/svg.svg"
+              src="/logo.png"
               alt="App Logo"
               style={{
                 marginBottom: isMobile ? 12 : 16,

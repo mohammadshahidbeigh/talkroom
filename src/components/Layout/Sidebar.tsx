@@ -80,7 +80,7 @@ const Sidebar = () => {
         }}
       >
         <img
-          src="/src/public/logo.png"
+          src="/logo.png"
           alt="App Logo"
           style={{width: isMobile ? "32px" : "40px", height: "auto"}}
         />
