@@ -1,8 +1,15 @@
 import {Request, Response} from "express";
 import prisma from "../models";
-import {Prisma, Participant} from "@prisma/client";
-import {PrismaClient} from "@prisma/client";
+import {Prisma} from "@prisma/client";
+import type {Participant as PrismaParticipant} from "@prisma/client";
 import {setChatCache, getChatCache} from "../services/redis";
+
+type ParticipantType = {
+  id: string;
+  userId: string;
+  chatId: string;
+  // ... other fields
+};
 
 export const getChats = async (req: Request, res: Response) => {
   try {
@@ -118,7 +125,7 @@ export const createChat = async (req: Request, res: Response) => {
           name: existingChat.name || "",
           type: existingChat.type,
           participants: existingChat.participants.map(
-            (p: Participant) => p.userId
+            (p: PrismaParticipant) => p.userId
           ),
         },
       });

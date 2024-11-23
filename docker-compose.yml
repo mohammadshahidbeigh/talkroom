@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./server/.env
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  client:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=http://server:5000
+      - VITE_SOCKET_URL=ws://server:5000
+    volumes:
+      - ./src:/app/src
+      - /app/node_modules
+    depends_on:
+      - server
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge 

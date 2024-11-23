@@ -84,11 +84,14 @@ const Register = () => {
   }) => {
     try {
       setIsLoading(true);
-      const response = await fetch("http://localhost:5000/auth/register", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(data),
-      });
+      const response = await fetch(
+        "https://talkroom-server-latest.onrender.com/auth/register",
+        {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(data),
+        }
+      );
       const responseData = await response.json();
 
       if (!response.ok) {

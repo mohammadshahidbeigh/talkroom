@@ -5,7 +5,10 @@ import path from "path";
 export const staticMiddleware: RequestHandler[] = [
   // CORS middleware specifically for static files
   ((req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
+    res.setHeader(
+      "Access-Control-Allow-Origin",
+      "https://talkroom-client.onrender.com"
+    );
     res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
     res.setHeader(
       "Access-Control-Allow-Headers",

@@ -1,7 +1,8 @@
 import {Request, Response} from "express";
 import multer from "multer";
-import prisma from "../models";
+import {PrismaClient} from "@prisma/client";
 import type {User} from ".prisma/client";
+import prisma from "../models";
 
 // Define a custom type for the authenticated request
 interface AuthenticatedRequest extends Request {

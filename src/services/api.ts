@@ -2,7 +2,7 @@
 import axios, {InternalAxiosRequestConfig} from "axios";
 import {User, Chat, Message} from "../types";
 
-const BASE_URL = "http://localhost:5000/";
+const BASE_URL = "https://talkroom-server-latest.onrender.com";
 
 const api = axios.create({
   baseURL: BASE_URL,

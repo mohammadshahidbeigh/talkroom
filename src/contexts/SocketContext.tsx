@@ -3,7 +3,7 @@ import React, {useEffect, useRef} from "react";
 import {io} from "socket.io-client";
 import {SocketContext} from "./SocketContextValue";
 
-const SOCKET_URL = "http://localhost:5000/";
+const SOCKET_URL = "https://talkroom-server-latest.onrender.com/";
 
 export const SocketProvider: React.FC<{children: React.ReactNode}> = ({
   children,

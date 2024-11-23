@@ -12,7 +12,7 @@ import type {
   RootState,
 } from "../types";
 
-const BASE_URL = "http://localhost:5000/";
+const BASE_URL = "https://talkroom-server-latest.onrender.com/";
 
 // Define tag types
 type TagTypes = "Messages";

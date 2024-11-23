@@ -49,7 +49,7 @@ import {
   useGetRoomParticipantsQuery,
 } from "../../services/apiSlice";
 import joinSound from "../../public/joined.mp3";
-import endSound from "../../public/end.mp3";
+import endSound from "../../public/End.mp3";
 
 interface Participant {
   userId: string;

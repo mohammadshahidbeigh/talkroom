@@ -125,13 +125,16 @@ const Dashboard = () => {
         return;
       }
 
-      const response = await fetch("http://localhost:5000/metrics", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      });
+      const response = await fetch(
+        "https://talkroom-server-latest.onrender.com/metrics",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
