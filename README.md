@@ -67,5 +67,19 @@ A modern and secure real-time chat application built with React, TypeScript, Nod
 
 ## Getting Started
 
+### Using Docker
+
+1. Clone the repository
+2. Make sure you have Docker and Docker Compose installed
+3. Build and start the containers:
+   ```bash
+   docker-compose up --build
+   ```
+4. Access the application:
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8080
+
+### Manual Installation
+
 1. Clone the repository
 2. Install dependencies:
