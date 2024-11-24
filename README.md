@@ -83,3 +83,6 @@ A modern and secure real-time chat application built with React, TypeScript, Nod
 
 1. Clone the repository
 2. Install dependencies:
+   ```bash
+   yarn install
+   ```
